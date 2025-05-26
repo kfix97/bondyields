@@ -167,7 +167,7 @@ export default function BondsPage() {
               </svg>
               <div className="opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity duration-300 absolute z-10 w-96 p-4 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg text-left text-sm text-gray-600 -translate-x-1/2 left-1/2">
                 <p className="mb-2">
-                  The spread between corporate and Treasury bond yields represents the credit risk premium investors demand to hold corporate bonds over 'risk-free' government bonds.
+                  The spread between corporate and Treasury bond yields represents the credit risk premium investors demand to hold corporate bonds over &apos;risk-free&apos; government bonds.
                 </p>
                 <p className="mb-2">
                   Treasury yields reflect the baseline cost of capital (risk-free rate), while corporate bond yields include additional compensation for default risk, liquidity, and other factors.
