@@ -104,7 +104,12 @@ export default function BondsPage() {
       try {
         setIsLoading(true);
         setError(null);
-        const response = await fetch(`/api/bonds?series=${selectedCorporateSeries}&treasury=${selectedTreasurySeries}`);
+        const queryParams = new URLSearchParams({
+          series: selectedCorporateSeries,
+          treasury: selectedTreasurySeries
+        });
+        
+        const response = await fetch(`/api/bonds?${queryParams.toString()}`);
         
         if (!response.ok) {
           throw new Error('Failed to fetch bond data');
@@ -142,8 +147,37 @@ export default function BondsPage() {
     <div className="flex flex-col items-center min-h-screen bg-white">
       <main className="w-full max-w-7xl pt-10">
         <div className="text-center">
-          <Title className="text-center text-gray-800 text-3xl mb-2">Bond Market Overview</Title>
-          <Text className="text-gray-600">Comparing Treasury and Corporate Bond Yields</Text>
+          <Title className="text-center text-gray-800 text-3xl mb-2">Bond Yield Spreads</Title>
+          <div className="flex items-center justify-center gap-2">
+            <Text className="text-gray-600">Comparing Treasury and Corporate Bond Yields</Text>
+            <div className="group relative inline-block">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={1.5}
+                stroke="currentColor"
+                className="w-5 h-5 text-gray-500 cursor-help"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z"
+                />
+              </svg>
+              <div className="opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity duration-300 absolute z-10 w-96 p-4 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg text-left text-sm text-gray-600 -translate-x-1/2 left-1/2">
+                <p className="mb-2">
+                  The spread between corporate and Treasury bond yields represents the credit risk premium investors demand to hold corporate bonds over 'risk-free' government bonds.
+                </p>
+                <p className="mb-2">
+                  Treasury yields reflect the baseline cost of capital (risk-free rate), while corporate bond yields include additional compensation for default risk, liquidity, and other factors.
+                </p>
+                <p>
+                  A widening spread typically signals increased market concern about corporate creditworthiness (e.g., during recessions), while a narrowing spread can indicate improving investor confidence.
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Bond Series Selection */}
