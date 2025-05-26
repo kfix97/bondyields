@@ -35,22 +35,29 @@ export default function Chart({ data, sources, colors }: ChartProps) {
   };
 
   return (
-    <ResponsiveContainer width="100%" height={400}>
+    <ResponsiveContainer width="100%" height={300}>
       <LineChart
         data={data}
         margin={{
           top: 5,
           right: 30,
           left: 20,
-          bottom: 5,
+          bottom: 25,
         }}
       >
         <CartesianGrid strokeDasharray="3 3" />
         <XAxis 
           dataKey="formattedDate" 
           tick={{ fill: 'black' }}
-          interval="preserveStartEnd"
-          tickFormatter={(date) => new Date(date).toLocaleDateString('en-US', { month: 'short', year: '2-digit' })}
+          interval="preserveEnd"
+          minTickGap={50}
+          tickFormatter={(date) => new Date(date).toLocaleDateString('en-US', { 
+            month: 'short',
+            year: 'numeric'
+          })}
+          angle={-45}
+          textAnchor="end"
+          height={60}
         />
         <YAxis 
           tick={{ fill: 'black' }}
@@ -67,13 +74,13 @@ export default function Chart({ data, sources, colors }: ChartProps) {
           labelFormatter={formatTooltipDate}
           formatter={(value: number) => [value.toFixed(2) + '%']}
         />
-        <Legend />
+        {sources.length > 1 && <Legend />}
         {sources.map(source => (
           <Line
             key={source}
             type="monotone"
             dataKey="yield"
-            data={data.filter(d => d.source === source)}
+            data={data}
             name={source}
             stroke={colors[source] || '#999'}
             dot={false}

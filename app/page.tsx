@@ -8,9 +8,7 @@ async function getBondData() {
   const host = headersList.get('host') || 'localhost:3000';
   const protocol = process.env.NODE_ENV === 'development' ? 'http' : 'https';
   
-  const res = await fetch(`${protocol}://${host}/api/bonds`, {
-    next: { revalidate: 3600 } // Revalidate every hour
-  });
+  const res = await fetch(`${protocol}://${host}/api/bonds`);
   
   if (!res.ok) {
     throw new Error('Failed to fetch bond data');

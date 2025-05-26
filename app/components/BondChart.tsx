@@ -35,20 +35,32 @@ export default function BondChart({ data }: BondChartProps) {
     );
   }
 
-  // Group data by source
-  const sources = Array.from(new Set(data.map(d => d.source)));
-  
   // Color mapping for different sources
   const colors = {
     'Treasury': '#4f46e5', // Indigo
     'Corporate AAA': '#16a34a', // Green
   };
 
-  // Format dates consistently
-  const formattedData = data.map(d => ({
-    ...d,
-    formattedDate: formatDate(d.date)
-  }));
+  // Format and separate data by source
+  const treasuryData = data
+    .filter(d => d.source === 'Treasury')
+    .map(d => ({
+      date: d.date,
+      formattedDate: formatDate(d.date),
+      yield: d.yield,
+      source: 'Treasury' as const
+    }))
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+  const corporateData = data
+    .filter(d => d.source === 'Corporate AAA')
+    .map(d => ({
+      date: d.date,
+      formattedDate: formatDate(d.date),
+      yield: d.yield,
+      source: 'Corporate AAA' as const
+    }))
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
   if (!isClient) {
     return (
@@ -61,15 +73,28 @@ export default function BondChart({ data }: BondChartProps) {
   return (
     <div style={{ width: '100%', height: '100%', background: 'white' }}>
       <div style={{ padding: '20px', color: 'black' }}>
-        <p>Available sources: {sources.join(', ')}</p>
-        <p>Data points: {formattedData.length}</p>
+        <p>Data points: Treasury ({treasuryData.length}), Corporate AAA ({corporateData.length})</p>
       </div>
       
-      <Chart 
-        data={formattedData}
-        sources={sources}
-        colors={colors}
-      />
+      <div className="space-y-8">
+        <div>
+          <h3 className="text-lg font-semibold mb-4 text-center">10-Year Treasury Yield</h3>
+          <Chart 
+            data={treasuryData}
+            sources={['Treasury']}
+            colors={colors}
+          />
+        </div>
+        
+        <div>
+          <h3 className="text-lg font-semibold mb-4 text-center">Corporate AAA Yield</h3>
+          <Chart 
+            data={corporateData}
+            sources={['Corporate AAA']}
+            colors={colors}
+          />
+        </div>
+      </div>
     </div>
   );
 } 
