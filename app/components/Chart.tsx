@@ -8,7 +8,8 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
-  ResponsiveContainer
+  ResponsiveContainer,
+  YAxisProps
 } from 'recharts';
 
 interface ChartData {
@@ -16,6 +17,7 @@ interface ChartData {
   formattedDate: string;
   treasury_yield: number | null;
   corporate_yield: number | null;
+  spread_yield: number | null;
 }
 
 interface ChartProps {
@@ -37,6 +39,14 @@ export default function Chart({ data, sources, colors, yieldKeys }: ChartProps) 
       month: 'short',
       day: 'numeric'
     });
+  };
+
+  // Custom tooltip formatter to handle different value types
+  const formatTooltipValue = (value: number, name: string) => {
+    if (name === 'Spread (Corporate - Treasury)') {
+      return [value.toFixed(2) + ' bps', 'Spread'];
+    }
+    return [value.toFixed(2) + '%', name];
   };
 
   return (
@@ -65,8 +75,16 @@ export default function Chart({ data, sources, colors, yieldKeys }: ChartProps) 
           height={60}
         />
         <YAxis 
+          yAxisId="yield"
           tick={{ fill: 'black' }}
           label={{ value: 'Yield (%)', angle: -90, position: 'insideLeft', fill: 'black' }}
+          domain={['auto', 'auto']}
+        />
+        <YAxis 
+          yAxisId="spread"
+          orientation="right"
+          tick={{ fill: '#dc2626' }}
+          label={{ value: 'Spread (bps)', angle: 90, position: 'insideRight', fill: '#dc2626' }}
           domain={['auto', 'auto']}
         />
         <Tooltip 
@@ -77,21 +95,26 @@ export default function Chart({ data, sources, colors, yieldKeys }: ChartProps) 
             color: 'black'
           }}
           labelFormatter={formatTooltipDate}
-          formatter={(value: number) => [value.toFixed(2) + '%']}
+          formatter={formatTooltipValue}
         />
         <Legend />
-        {sources.map(source => (
-          <Line
-            key={source}
-            type="monotone"
-            dataKey={yieldKeys[source]}
-            name={source}
-            stroke={colors[source] || '#999'}
-            dot={false}
-            strokeWidth={2}
-            connectNulls
-          />
-        ))}
+        {sources.map(source => {
+          const isSpread = source === 'Spread (Corporate - Treasury)';
+          return (
+            <Line
+              key={source}
+              type="monotone"
+              dataKey={yieldKeys[source]}
+              name={source}
+              stroke={colors[source] || '#999'}
+              dot={false}
+              strokeWidth={2}
+              connectNulls
+              yAxisId={isSpread ? 'spread' : 'yield'}
+              strokeDasharray={isSpread ? '5 5' : undefined}
+            />
+          );
+        })}
       </LineChart>
     </ResponsiveContainer>
   );

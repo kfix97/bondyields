@@ -16,6 +16,7 @@ interface ChartData {
   formattedDate: string;
   treasury_yield: number | null;
   corporate_yield: number | null;
+  spread_yield: number | null;
 }
 
 interface BondChartProps {
@@ -67,6 +68,7 @@ export default function BondChart({ data }: BondChartProps) {
   const colors = {
     'Treasury': '#4f46e5', // Indigo
     'Corporate AAA': '#16a34a', // Green
+    'Spread (Corporate - Treasury)': '#dc2626', // Red
   };
 
   // Separate Treasury and Corporate data
@@ -116,11 +118,17 @@ export default function BondChart({ data }: BondChartProps) {
     const treasuryPoint = treasuryData.find(d => d.date === dateStr);
     const corporateYield = corporateYieldMap.get(dateStr);
     
+    // Calculate spread only when both yields are available
+    const spread = (corporateYield && treasuryPoint?.yield)
+      ? (corporateYield - treasuryPoint.yield) * 100 // Convert to basis points
+      : null;
+
     return {
       date: dateStr,
       formattedDate: formatDate(dateStr),
       treasury_yield: treasuryPoint?.yield || null,
-      corporate_yield: corporateYield || null
+      corporate_yield: corporateYield || null,
+      spread_yield: spread
     };
   });
 
@@ -142,11 +150,12 @@ export default function BondChart({ data }: BondChartProps) {
         <h3 className="text-lg font-semibold mb-4 text-center">Treasury vs Corporate AAA Yield Comparison</h3>
         <Chart 
           data={combinedData}
-          sources={['Treasury', 'Corporate AAA']}
+          sources={['Treasury', 'Corporate AAA', 'Spread (Corporate - Treasury)']}
           colors={colors}
           yieldKeys={{
             'Treasury': 'treasury_yield',
-            'Corporate AAA': 'corporate_yield'
+            'Corporate AAA': 'corporate_yield',
+            'Spread (Corporate - Treasury)': 'spread_yield'
           }}
         />
       </div>
