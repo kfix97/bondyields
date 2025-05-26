@@ -28,6 +28,15 @@ const formatDate = (dateStr: string) => {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 };
 
+// Helper function to format a date for display
+const formatDisplayDate = (dateStr: string) => {
+  return new Date(dateStr).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+  });
+};
+
 // Helper function to check if a date is a weekend
 const isWeekend = (date: Date): boolean => {
   const day = date.getDay();
@@ -130,7 +139,10 @@ export default function BondChart({ data }: BondChartProps) {
       corporate_yield: corporateYield || null,
       spread_yield: spread
     };
-  });
+  }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+  // Get the latest values
+  const latestData = combinedData[combinedData.length - 1];
 
   if (!isClient) {
     return (
@@ -142,12 +154,39 @@ export default function BondChart({ data }: BondChartProps) {
 
   return (
     <div style={{ width: '100%', height: '100%', background: 'white' }}>
-      <div style={{ padding: '20px', color: 'black' }}>
-        <p>Business days: {combinedData.length}</p>
-      </div>
-      
-      <div>
-        <h3 className="text-lg font-semibold mb-4 text-center">Treasury vs Corporate AAA Yield Comparison</h3>
+      <div className="space-y-6">
+        {/* Latest Values Header */}
+        <div className="grid grid-cols-3 gap-4 text-center">
+          <div className="p-4 rounded-lg bg-indigo-50">
+            <h4 className="text-sm font-medium text-indigo-900 mb-1">Treasury Yield</h4>
+            <p className="text-2xl font-bold text-indigo-700 mb-1">
+              {latestData.treasury_yield?.toFixed(2)}%
+            </p>
+            <p className="text-xs text-indigo-600">
+              as of {formatDisplayDate(latestData.date)}
+            </p>
+          </div>
+          <div className="p-4 rounded-lg bg-green-50">
+            <h4 className="text-sm font-medium text-green-900 mb-1">Corporate AAA Yield</h4>
+            <p className="text-2xl font-bold text-green-700 mb-1">
+              {latestData.corporate_yield?.toFixed(2)}%
+            </p>
+            <p className="text-xs text-green-600">
+              as of {formatDisplayDate(latestData.date)}
+            </p>
+          </div>
+          <div className="p-4 rounded-lg bg-red-50">
+            <h4 className="text-sm font-medium text-red-900 mb-1">Spread</h4>
+            <p className="text-2xl font-bold text-red-700 mb-1">
+              {latestData.spread_yield?.toFixed(0)} bps
+            </p>
+            <p className="text-xs text-red-600">
+              as of {formatDisplayDate(latestData.date)}
+            </p>
+          </div>
+        </div>
+
+        {/* Chart Section */}
         <Chart 
           data={combinedData}
           sources={['Treasury', 'Corporate AAA', 'Spread (Corporate - Treasury)']}

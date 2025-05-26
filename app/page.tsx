@@ -31,38 +31,15 @@ export default async function BondsPage() {
     : 'N/A';
 
   return (
-    <div className="flex flex-col justify-center items-center min-h-screen bg-white">
-      <main className="p-4 md:p-10 w-full max-w-7xl">
-        <div className="text-center mb-8">
+    <div className="flex flex-col items-center min-h-screen bg-white">
+      <main className="w-full max-w-7xl pt-10">
+        <div className="text-center">
           <Title className="text-center text-gray-800 text-3xl mb-2">Bond Market Overview</Title>
-          <Text className="text-gray-600 mb-6">Comparing Treasury and Corporate Bond Yields</Text>
-          
-          <div className="flex justify-center gap-12 mb-8">
-            <div className="text-center">
-              <Text className="text-gray-600 mb-1">Latest Treasury Yield</Text>
-              <Metric className="text-gray-900">{treasuryYield}</Metric>
-              {response?.latestData?.treasury?.date && (
-                <Text className="text-sm text-gray-500 mt-1">
-                  as of {new Date(response.latestData.treasury.date).toLocaleDateString()}
-                </Text>
-              )}
-            </div>
-            <div className="text-center">
-              <Text className="text-gray-600 mb-1">Latest AAA Corporate Yield</Text>
-              <Metric className="text-gray-900">{corporateYield}</Metric>
-              {response?.latestData?.corporate?.date && (
-                <Text className="text-sm text-gray-500 mt-1">
-                  as of {new Date(response.latestData.corporate.date).toLocaleDateString()}
-                </Text>
-              )}
-            </div>
-          </div>
+          <Text className="text-gray-600">Comparing Treasury and Corporate Bond Yields</Text>
         </div>
 
         <Card className="bg-white shadow-md">
-          <Title className="text-gray-800 text-center mb-2">Yield Comparison Over Time</Title>
-          <Text className="text-gray-600 text-center mb-6">Treasury vs Corporate Bond Yields</Text>
-          <div style={{ width: '100%', minHeight: '500px', background: 'white', padding: '20px' }}>
+          <div style={{ width: '100%', minHeight: '500px', background: 'white' }}>
             <ErrorBoundary>
               <BondChart data={response?.chartData || []} />
             </ErrorBoundary>
