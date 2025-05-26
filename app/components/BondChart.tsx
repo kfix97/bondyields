@@ -76,14 +76,14 @@ export default function BondChart({ data }: BondChartProps) {
   // Color mapping for different sources
   const colors = {
     'Treasury': '#4f46e5', // Indigo
-    'Corporate AAA': '#16a34a', // Green
+    'Corporate': '#16a34a', // Green
     'Spread (Corporate - Treasury)': '#dc2626', // Red
   };
 
   // Separate Treasury and Corporate data
   const treasuryData = data.filter(d => d.source === 'Treasury');
   const corporateData = data
-    .filter(d => d.source === 'Corporate AAA')
+    .filter(d => d.source === 'Corporate')
     .filter(d => d.yield > 0) // Filter out any zero or negative yields
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
@@ -167,7 +167,7 @@ export default function BondChart({ data }: BondChartProps) {
             </p>
           </div>
           <div className="p-4 rounded-lg bg-green-50">
-            <h4 className="text-sm font-medium text-green-900 mb-1">Corporate AAA Yield</h4>
+            <h4 className="text-sm font-medium text-green-900 mb-1">Corporate Yield</h4>
             <p className="text-2xl font-bold text-green-700 mb-1">
               {latestData.corporate_yield?.toFixed(2)}%
             </p>
@@ -189,11 +189,11 @@ export default function BondChart({ data }: BondChartProps) {
         {/* Chart Section */}
         <Chart 
           data={combinedData}
-          sources={['Treasury', 'Corporate AAA', 'Spread (Corporate - Treasury)']}
+          sources={['Treasury', 'Corporate', 'Spread (Corporate - Treasury)']}
           colors={colors}
           yieldKeys={{
             'Treasury': 'treasury_yield',
-            'Corporate AAA': 'corporate_yield',
+            'Corporate': 'corporate_yield',
             'Spread (Corporate - Treasury)': 'spread_yield'
           }}
         />

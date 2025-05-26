@@ -11,11 +11,18 @@ interface FREDObservation {
 interface BondDataPoint {
   date: string;
   yield: number | null;
-  source: 'Treasury' | 'Corporate AAA';
+  source: string;
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const { searchParams } = new URL(request.url);
+    const series = searchParams.get('series');
+
+    if (!series) {
+      return NextResponse.json({ error: 'Series parameter is required' }, { status: 400 });
+    }
+
     console.log('API route called - Starting FRED API request');
     
     // Calculate dates for one year range
@@ -24,16 +31,15 @@ export async function GET() {
     console.log('Start Date:', startDate);
     console.log('End Date:', endDate);
     
-    
-    // Get Treasury data
+    // Get Treasury data (10-year constant maturity rate)
     const fredUrl = `https://api.stlouisfed.org/fred/series/observations?series_id=DGS10&api_key=${FRED_API_KEY}&file_type=json&sort_order=asc&observation_start=${startDate}&observation_end=${endDate}`;
-    console.log('FRED URL:', fredUrl.replace(FRED_API_KEY || '', 'HIDDEN_KEY'));
+    console.log('FRED Treasury URL:', fredUrl.replace(FRED_API_KEY || '', 'HIDDEN_KEY'));
     
     const fredResponse = await axios.get<{ observations: FREDObservation[] }>(fredUrl);
-    console.log('FRED API Response Status:', fredResponse.status);
+    console.log('FRED Treasury API Response Status:', fredResponse.status);
 
     if (!fredResponse.data.observations) {
-      throw new Error('No observations found in FRED response');
+      throw new Error('No observations found in FRED response for Treasury data');
     }
 
     const fredData = fredResponse.data.observations.map((item: FREDObservation): BondDataPoint => ({
@@ -42,18 +48,25 @@ export async function GET() {
       source: 'Treasury'
     })).filter((item): item is BondDataPoint => item.yield !== null); // Remove null values
 
-    // Get corporate bond data (AAA)
-    const aaaUrl = `https://api.stlouisfed.org/fred/series/observations?series_id=AAA&api_key=${FRED_API_KEY}&file_type=json&sort_order=asc&observation_start=${startDate}&observation_end=${endDate}`;
-    const aaaResponse = await axios.get<{ observations: FREDObservation[] }>(aaaUrl);
+    // Get corporate bond data using the provided series
+    const corporateUrl = `https://api.stlouisfed.org/fred/series/observations?series_id=${series}&api_key=${FRED_API_KEY}&file_type=json&sort_order=asc&observation_start=${startDate}&observation_end=${endDate}`;
+    console.log('FRED Corporate URL:', corporateUrl.replace(FRED_API_KEY || '', 'HIDDEN_KEY'));
+    
+    const corporateResponse = await axios.get<{ observations: FREDObservation[] }>(corporateUrl);
+    console.log('FRED Corporate API Response Status:', corporateResponse.status);
 
-    const aaaData = aaaResponse.data.observations.map((item: FREDObservation): BondDataPoint => ({
+    if (!corporateResponse.data.observations) {
+      throw new Error('No observations found in FRED response for Corporate data');
+    }
+
+    const corporateData = corporateResponse.data.observations.map((item: FREDObservation): BondDataPoint => ({
       date: item.date,
       yield: parseFloat(item.value) || null,
-      source: 'Corporate AAA'
-    })).filter((item): item is BondDataPoint => item.yield !== null);
+      source: 'Corporate'
+    })).filter((item): item is BondDataPoint => item.yield !== null);    
 
     // Combine both datasets for chart data
-    const chartData = [...fredData, ...aaaData].sort((a, b) => 
+    const chartData = [...fredData, ...corporateData].sort((a, b) => 
       new Date(a.date).getTime() - new Date(b.date).getTime()
     );
 
@@ -61,7 +74,7 @@ export async function GET() {
     const formattedResponse = {
       latestData: {
         treasury: fredData[fredData.length - 1], // Get the most recent data point
-        corporate: aaaData[aaaData.length - 1]
+        corporate: corporateData[corporateData.length - 1]
       },
       chartData
     };
