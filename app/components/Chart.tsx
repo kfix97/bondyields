@@ -9,7 +9,6 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
-  YAxisProps
 } from 'recharts';
 
 interface ChartData {

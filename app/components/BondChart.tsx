@@ -11,14 +11,6 @@ interface ChartDataPoint {
   source: string;
 }
 
-interface ChartData {
-  date: string;
-  formattedDate: string;
-  treasury_yield: number | null;
-  corporate_yield: number | null;
-  spread_yield: number | null;
-}
-
 interface BondChartProps {
   data: ChartDataPoint[];
 }

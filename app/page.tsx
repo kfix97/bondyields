@@ -1,6 +1,6 @@
 'use client';
 
-import { Card, Title, Text, Grid, Metric, Flex } from '@tremor/react';
+import { Card, Title, Text } from '@tremor/react';
 import BondChart from './components/BondChart';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { useState, useEffect } from 'react';
@@ -75,7 +75,27 @@ const treasurySeriesData = [
 export default function BondsPage() {
   const [selectedCorporateSeries, setSelectedCorporateSeries] = useState(corporateSeriesData[0].value);
   const [selectedTreasurySeries, setSelectedTreasurySeries] = useState(treasurySeriesData[0].value);
-  const [bondData, setBondData] = useState<any>(null);
+  const [bondData, setBondData] = useState<{
+    status: string;
+    message: string;
+    latestData: {
+      treasury: {
+        date: string;
+        yield: number;
+        source: string;
+      };
+      corporate: {
+        date: string;
+        yield: number;
+        source: string;
+      };
+    };
+    chartData: Array<{
+      date: string;
+      yield: number;
+      source: string;
+    }>;
+  } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -127,41 +147,43 @@ export default function BondsPage() {
         </div>
 
         {/* Bond Series Selection */}
-        <div className="w-full max-w-2xl mx-auto my-6 space-y-4">
-          <div>
-            <label htmlFor="treasury-select" className="block text-sm font-medium text-gray-700 mb-2">
-              Treasury Series
-            </label>
-            <select
-              id="treasury-select"
-              value={selectedTreasurySeries}
-              onChange={(e) => setSelectedTreasurySeries(e.target.value)}
-              className="block w-full px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-            >
-              {treasurySeriesData.map((series) => (
-                <option key={series.value} value={series.value}>
-                  {series.name}
-                </option>
-              ))}
-            </select>
-          </div>
+        <div className="w-full max-w-6xl mx-auto my-6">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="treasury-select" className="block text-sm font-medium text-gray-700 mb-2">
+                Treasury Series
+              </label>
+              <select
+                id="treasury-select"
+                value={selectedTreasurySeries}
+                onChange={(e) => setSelectedTreasurySeries(e.target.value)}
+                className="block w-full px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              >
+                {treasurySeriesData.map((series) => (
+                  <option key={series.value} value={series.value}>
+                    {series.name}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-          <div>
-            <label htmlFor="corporate-select" className="block text-sm font-medium text-gray-700 mb-2">
-              Corporate Series
-            </label>
-            <select
-              id="corporate-select"
-              value={selectedCorporateSeries}
-              onChange={(e) => setSelectedCorporateSeries(e.target.value)}
-              className="block w-full px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-            >
-              {corporateSeriesData.map((series) => (
-                <option key={series.value} value={series.value}>
-                  {series.name}
-                </option>
-              ))}
-            </select>
+            <div>
+              <label htmlFor="corporate-select" className="block text-sm font-medium text-gray-700 mb-2">
+                Corporate Series
+              </label>
+              <select
+                id="corporate-select"
+                value={selectedCorporateSeries}
+                onChange={(e) => setSelectedCorporateSeries(e.target.value)}
+                className="block w-full px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              >
+                {corporateSeriesData.map((series) => (
+                  <option key={series.value} value={series.value}>
+                    {series.name}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
 
