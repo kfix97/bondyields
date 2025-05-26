@@ -11,20 +11,25 @@ import {
   ResponsiveContainer
 } from 'recharts';
 
+interface ChartData {
+  date: string;
+  formattedDate: string;
+  treasury_yield: number | null;
+  corporate_yield: number | null;
+}
+
 interface ChartProps {
-  data: Array<{
-    date: string;
-    yield: number;
-    source: string;
-    formattedDate: string;
-  }>;
+  data: ChartData[];
   sources: string[];
   colors: {
     [key: string]: string;
   };
+  yieldKeys: {
+    [key: string]: string;
+  };
 }
 
-export default function Chart({ data, sources, colors }: ChartProps) {
+export default function Chart({ data, sources, colors, yieldKeys }: ChartProps) {
   // Format dates for tooltip
   const formatTooltipDate = (date: string) => {
     return new Date(date).toLocaleDateString('en-US', {
@@ -35,7 +40,7 @@ export default function Chart({ data, sources, colors }: ChartProps) {
   };
 
   return (
-    <ResponsiveContainer width="100%" height={300}>
+    <ResponsiveContainer width="100%" height={400}>
       <LineChart
         data={data}
         margin={{
@@ -74,13 +79,12 @@ export default function Chart({ data, sources, colors }: ChartProps) {
           labelFormatter={formatTooltipDate}
           formatter={(value: number) => [value.toFixed(2) + '%']}
         />
-        {sources.length > 1 && <Legend />}
+        <Legend />
         {sources.map(source => (
           <Line
             key={source}
             type="monotone"
-            dataKey="yield"
-            data={data}
+            dataKey={yieldKeys[source]}
             name={source}
             stroke={colors[source] || '#999'}
             dot={false}
