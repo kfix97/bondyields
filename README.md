@@ -5,3 +5,5 @@ Treasury yields reflect the baseline cost of capital (risk-free rate), while cor
 A widening spread typically signals increased market concern about corporate creditworthiness (e.g., during recessions), while a narrowing spread can indicate improving investor confidence.
 
 Site available at https://bondyields.vercel.app/
+
+Built with help from Cursor and Mike Osborne
