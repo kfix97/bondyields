@@ -17,13 +17,18 @@ interface BondDataPoint {
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const series = searchParams.get('series');
+    const corporateSeries = searchParams.get('series');
+    const treasurySeries = searchParams.get('treasury');
 
-    if (!series) {
-      return NextResponse.json({ error: 'Series parameter is required' }, { status: 400 });
+    if (!corporateSeries || !treasurySeries) {
+      return NextResponse.json({ 
+        error: 'Both series and treasury parameters are required' 
+      }, { status: 400 });
     }
 
     console.log('API route called - Starting FRED API request');
+    console.log('Corporate Series:', corporateSeries);
+    console.log('Treasury Series:', treasurySeries);
     
     // Calculate dates for one year range
     const endDate = new Date().toISOString().split('T')[0];
@@ -31,8 +36,8 @@ export async function GET(request: Request) {
     console.log('Start Date:', startDate);
     console.log('End Date:', endDate);
     
-    // Get Treasury data (10-year constant maturity rate)
-    const fredUrl = `https://api.stlouisfed.org/fred/series/observations?series_id=DGS10&api_key=${FRED_API_KEY}&file_type=json&sort_order=asc&observation_start=${startDate}&observation_end=${endDate}`;
+    // Get Treasury data using the selected series
+    const fredUrl = `https://api.stlouisfed.org/fred/series/observations?series_id=${treasurySeries}&api_key=${FRED_API_KEY}&file_type=json&sort_order=asc&observation_start=${startDate}&observation_end=${endDate}`;
     console.log('FRED Treasury URL:', fredUrl.replace(FRED_API_KEY || '', 'HIDDEN_KEY'));
     
     const fredResponse = await axios.get<{ observations: FREDObservation[] }>(fredUrl);
@@ -49,7 +54,7 @@ export async function GET(request: Request) {
     })).filter((item): item is BondDataPoint => item.yield !== null); // Remove null values
 
     // Get corporate bond data using the provided series
-    const corporateUrl = `https://api.stlouisfed.org/fred/series/observations?series_id=${series}&api_key=${FRED_API_KEY}&file_type=json&sort_order=asc&observation_start=${startDate}&observation_end=${endDate}`;
+    const corporateUrl = `https://api.stlouisfed.org/fred/series/observations?series_id=${corporateSeries}&api_key=${FRED_API_KEY}&file_type=json&sort_order=asc&observation_start=${startDate}&observation_end=${endDate}`;
     console.log('FRED Corporate URL:', corporateUrl.replace(FRED_API_KEY || '', 'HIDDEN_KEY'));
     
     const corporateResponse = await axios.get<{ observations: FREDObservation[] }>(corporateUrl);
@@ -63,7 +68,7 @@ export async function GET(request: Request) {
       date: item.date,
       yield: parseFloat(item.value) || null,
       source: 'Corporate'
-    })).filter((item): item is BondDataPoint => item.yield !== null);    
+    })).filter((item): item is BondDataPoint => item.yield !== null);
 
     // Combine both datasets for chart data
     const chartData = [...fredData, ...corporateData].sort((a, b) => 

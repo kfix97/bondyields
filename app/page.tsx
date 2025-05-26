@@ -5,8 +5,8 @@ import BondChart from './components/BondChart';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { useState, useEffect } from 'react';
 
-// Series data for bond options
-const seriesData = [
+// Series data for corporate bond options
+const corporateSeriesData = [
   { value: "AAA", name: "Moody's Seasoned Aaa Corporate Bond Yield" },
   { value: "BAMLC0A4CBBB", name: "ICE BofA BBB US Corporate Index Option-Adjusted Spread" },
   { value: "DBAA", name: "Moody's Seasoned Baa Corporate Bond Yield" },
@@ -55,8 +55,26 @@ const seriesData = [
   { value: "HQMCB2YR", name: "2-Year High Quality Market (HQM) Corporate Bond Spot Rate" }
 ];
 
+// Series data for treasury options
+const treasurySeriesData = [
+  { value: "DGS10", name: "Market Yield on U.S. Treasury Securities at 10-Year Constant Maturity, Quoted on an Investment Basis" },
+  { value: "DFII10", name: "Market Yield on U.S. Treasury Securities at 10-Year Constant Maturity, Quoted on an Investment Basis, Inflation-Indexed" },
+  { value: "DGS1", name: "Market Yield on U.S. Treasury Securities at 1-Year Constant Maturity, Quoted on an Investment Basis" },
+  { value: "DGS2", name: "Market Yield on U.S. Treasury Securities at 2-Year Constant Maturity, Quoted on an Investment Basis" },
+  { value: "DGS5", name: "Market Yield on U.S. Treasury Securities at 5-Year Constant Maturity, Quoted on an Investment Basis" },
+  { value: "DGS30", name: "Market Yield on U.S. Treasury Securities at 30-Year Constant Maturity, Quoted on an Investment Basis" },
+  { value: "DGS20", name: "Market Yield on U.S. Treasury Securities at 20-Year Constant Maturity, Quoted on an Investment Basis" },
+  { value: "DGS3MO", name: "Market Yield on U.S. Treasury Securities at 3-Month Constant Maturity, Quoted on an Investment Basis" },
+  { value: "DGS1MO", name: "Market Yield on U.S. Treasury Securities at 1-Month Constant Maturity, Quoted on an Investment Basis" },
+  { value: "DFII5", name: "Market Yield on U.S. Treasury Securities at 5-Year Constant Maturity, Quoted on an Investment Basis, Inflation-Indexed" },
+  { value: "DGS3", name: "Market Yield on U.S. Treasury Securities at 3-Year Constant Maturity, Quoted on an Investment Basis" },
+  { value: "DGS6MO", name: "Market Yield on U.S. Treasury Securities at 6-Month Constant Maturity, Quoted on an Investment Basis" },
+  { value: "DGS7", name: "Market Yield on U.S. Treasury Securities at 7-Year Constant Maturity, Quoted on an Investment Basis" }
+];
+
 export default function BondsPage() {
-  const [selectedSeries, setSelectedSeries] = useState(seriesData[0].value);
+  const [selectedCorporateSeries, setSelectedCorporateSeries] = useState(corporateSeriesData[0].value);
+  const [selectedTreasurySeries, setSelectedTreasurySeries] = useState(treasurySeriesData[0].value);
   const [bondData, setBondData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -66,7 +84,7 @@ export default function BondsPage() {
       try {
         setIsLoading(true);
         setError(null);
-        const response = await fetch(`/api/bonds?series=${selectedSeries}`);
+        const response = await fetch(`/api/bonds?series=${selectedCorporateSeries}&treasury=${selectedTreasurySeries}`);
         
         if (!response.ok) {
           throw new Error('Failed to fetch bond data');
@@ -82,7 +100,7 @@ export default function BondsPage() {
     };
     
     fetchData();
-  }, [selectedSeries]);
+  }, [selectedCorporateSeries, selectedTreasurySeries]);
 
   if (error) {
     return (
@@ -100,15 +118,6 @@ export default function BondsPage() {
     );
   }
 
-  // Format the yield values with proper handling for null/undefined
-  const treasuryYield = bondData?.latestData?.treasury?.yield !== undefined 
-    ? `${bondData.latestData.treasury.yield.toFixed(2)}%`
-    : 'N/A';
-    
-  const corporateYield = bondData?.latestData?.corporate?.yield !== undefined 
-    ? `${bondData.latestData.corporate.yield.toFixed(2)}%`
-    : 'N/A';
-
   return (
     <div className="flex flex-col items-center min-h-screen bg-white">
       <main className="w-full max-w-7xl pt-10">
@@ -118,19 +127,42 @@ export default function BondsPage() {
         </div>
 
         {/* Bond Series Selection */}
-        <div className="w-full max-w-2xl mx-auto my-6">
-          <Text className="text-gray-600">Select a corporate series to compare:</Text>
-          <select
-            value={selectedSeries}
-            onChange={(e) => setSelectedSeries(e.target.value)}
-            className="block w-full px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-          >
-            {seriesData.map((series) => (
-              <option key={series.value} value={series.value}>
-                {series.name}
-              </option>
-            ))}
-          </select>
+        <div className="w-full max-w-2xl mx-auto my-6 space-y-4">
+          <div>
+            <label htmlFor="treasury-select" className="block text-sm font-medium text-gray-700 mb-2">
+              Treasury Series
+            </label>
+            <select
+              id="treasury-select"
+              value={selectedTreasurySeries}
+              onChange={(e) => setSelectedTreasurySeries(e.target.value)}
+              className="block w-full px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            >
+              {treasurySeriesData.map((series) => (
+                <option key={series.value} value={series.value}>
+                  {series.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label htmlFor="corporate-select" className="block text-sm font-medium text-gray-700 mb-2">
+              Corporate Series
+            </label>
+            <select
+              id="corporate-select"
+              value={selectedCorporateSeries}
+              onChange={(e) => setSelectedCorporateSeries(e.target.value)}
+              className="block w-full px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            >
+              {corporateSeriesData.map((series) => (
+                <option key={series.value} value={series.value}>
+                  {series.name}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         <Card className="bg-white shadow-md">
