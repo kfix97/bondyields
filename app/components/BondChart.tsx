@@ -27,8 +27,6 @@ export default function BondChart({ data }: BondChartProps) {
     setIsClient(true);
   }, []);
 
-  console.log('BondChart rendering with data:', data);
-
   if (!data || data.length === 0) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -42,9 +40,8 @@ export default function BondChart({ data }: BondChartProps) {
   
   // Color mapping for different sources
   const colors = {
-    'FRED': '#4f46e5', // Indigo
-    'Alpha Vantage': '#16a34a', // Green
-    'Corporate AAA': '#eab308' // Yellow
+    'Treasury': '#4f46e5', // Indigo
+    'Corporate AAA': '#16a34a', // Green
   };
 
   // Format dates consistently

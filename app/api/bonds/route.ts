@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import axios, { AxiosError } from 'axios';
 
-// Temporarily hardcoded for debugging
 const FRED_API_KEY = process.env.FRED_API_KEY;
 
 export async function GET() {
@@ -14,7 +13,6 @@ export async function GET() {
     
     const fredResponse = await axios.get(fredUrl);
     console.log('FRED API Response Status:', fredResponse.status);
-    console.log('FRED API Response Data Keys:', Object.keys(fredResponse.data));
 
     if (!fredResponse.data.observations) {
       throw new Error('No observations found in FRED response');
@@ -22,20 +20,33 @@ export async function GET() {
 
     const fredData = fredResponse.data.observations.map((item: any) => ({
       date: item.date,
-      yield: parseFloat(item.value),
+      yield: parseFloat(item.value) || null, // Handle 'ND' (no data) values
       source: 'Treasury'
-    }));
+    })).filter(item => item.yield !== null); // Remove null values
 
-    // Format the response to match the expected structure
+    // Get corporate bond data (AAA)
+    const aaaUrl = `https://api.stlouisfed.org/fred/series/observations?series_id=AAA&api_key=${FRED_API_KEY}&file_type=json&sort_order=asc&limit=252`;
+    const aaaResponse = await axios.get(aaaUrl);
+
+    const aaaData = aaaResponse.data.observations.map((item: any) => ({
+      date: item.date,
+      yield: parseFloat(item.value) || null,
+      source: 'Corporate AAA'
+    })).filter(item => item.yield !== null);
+
+    // Combine both datasets for chart data
+    const chartData = [...fredData, ...aaaData];
+
+    // Format the response
     const formattedResponse = {
       latestData: {
         treasury: fredData[fredData.length - 1], // Get the most recent data point
-        corporate: null
+        corporate: aaaData[aaaData.length - 1]
       },
-      chartData: fredData
+      chartData
     };
 
-    console.log('Successfully processed FRED data, count:', fredData.length);
+    console.log('Successfully processed bond data');
 
     return NextResponse.json({
       status: 'success',

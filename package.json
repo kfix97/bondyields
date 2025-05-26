@@ -3,30 +3,28 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"
   },
   "dependencies": {
-    "@headlessui/tailwindcss": "^0.2.2",
-    "@tremor/react": "^3.12.1",
-    "autoprefixer": "^10.4.21",
-    "axios": "^1.6.7",
-    "next": "14.1.0",
+    "@tremor/react": "^3.18.7",
+    "axios": "^1.9.0",
+    "next": "15.3.2",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "recharts": "^2.15.3"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
+    "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "eslint": "^9",
-    "eslint-config-next": "14.1.0",
-    "postcss": "^8",
-    "tailwindcss": "^3.4.1",
+    "eslint-config-next": "15.3.2",
+    "tailwindcss": "^4",
     "typescript": "^5"
   }
 }
