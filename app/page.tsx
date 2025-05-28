@@ -149,7 +149,7 @@ export default function BondsPage() {
         <div className="text-center">
           <Title className="text-center text-gray-800 text-3xl mb-2">Bond Yield Spreads</Title>
           <div className="flex items-center justify-center gap-2">
-            <Text className="text-gray-600">Comparing Treasury and Corporate Bond Yields</Text>
+            <Text className="text-gray-600">Comparing Treasury and Corporate Yields</Text>
             <div className="group relative inline-block">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
