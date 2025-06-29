@@ -250,7 +250,7 @@ export default function BondsPage() {
 
         {/* Date Range Selection */}
         <div className="w-full max-w-6xl mx-auto my-6 flex flex-col md:flex-row items-center gap-4">
-          <label className="flex flex-col text-sm font-medium">
+          <label className="flex flex-col text-sm font-medium text-black">
             Start Date
             <input
               type="date"
@@ -261,8 +261,8 @@ export default function BondsPage() {
               className="border border-gray-300 rounded px-2 py-1 mt-1 text-black bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
             />
           </label>
-          <span className="mx-2">to</span>
-          <label className="flex flex-col text-sm font-medium">
+          <span className="mx-2 text-black">to</span>
+          <label className="flex flex-col text-sm font-medium text-black">
             End Date
             <input
               type="date"
