@@ -258,7 +258,7 @@ export default function BondsPage() {
               max={endDate}
               min={minAllowedDate}
               onChange={e => setStartDate(e.target.value)}
-              className="border rounded px-2 py-1 mt-1"
+              className="border border-gray-300 rounded px-2 py-1 mt-1 text-black bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
             />
           </label>
           <span className="mx-2">to</span>
@@ -270,7 +270,7 @@ export default function BondsPage() {
               min={startDate}
               max={maxAllowedDate}
               onChange={e => setEndDate(e.target.value)}
-              className="border rounded px-2 py-1 mt-1"
+              className="border border-gray-300 rounded px-2 py-1 mt-1 text-black bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
             />
           </label>
           {dateError && <div className="text-red-600 text-sm mb-2">{dateError}</div>}

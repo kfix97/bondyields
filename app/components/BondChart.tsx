@@ -190,7 +190,7 @@ export default function BondChart({ data, disableDateFilter = false }: BondChart
                 min={formatDate(minDate.toISOString())}
                 max={endDate}
                 onChange={e => setStartDate(e.target.value)}
-                className="border rounded px-2 py-1 mt-1"
+                className="border border-gray-300 rounded px-2 py-1 mt-1 text-black bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
               />
             </label>
             <span className="mx-2">to</span>
@@ -202,7 +202,7 @@ export default function BondChart({ data, disableDateFilter = false }: BondChart
                 min={startDate}
                 max={formatDate(maxDate.toISOString())}
                 onChange={e => setEndDate(e.target.value)}
-                className="border rounded px-2 py-1 mt-1"
+                className="border border-gray-300 rounded px-2 py-1 mt-1 text-black bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
               />
             </label>
           </div>
