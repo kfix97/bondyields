@@ -3,7 +3,7 @@
 import { Card, Title, Text } from '@tremor/react';
 import BondChart from './components/BondChart';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 // Series data for corporate bond options
 const corporateSeriesData = [
@@ -72,6 +72,13 @@ const treasurySeriesData = [
   { value: "DGS7", name: "Market Yield on U.S. Treasury Securities at 7-Year Constant Maturity, Quoted on an Investment Basis" }
 ];
 
+// Utility to check if a string is a valid ISO date (yyyy-mm-dd)
+function isValidISODate(dateStr: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return false;
+  const date = new Date(dateStr);
+  return !isNaN(date.getTime()) && dateStr === date.toISOString().split('T')[0];
+}
+
 export default function BondsPage() {
   const [selectedCorporateSeries, setSelectedCorporateSeries] = useState(corporateSeriesData[0].value);
   const [selectedTreasurySeries, setSelectedTreasurySeries] = useState(treasurySeriesData[0].value);
@@ -99,46 +106,70 @@ export default function BondsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-        const queryParams = new URLSearchParams({
-          series: selectedCorporateSeries,
-          treasury: selectedTreasurySeries
-        });
-        
-        const response = await fetch(`/api/bonds?${queryParams.toString()}`);
-        
-        if (!response.ok) {
-          throw new Error('Failed to fetch bond data');
-        }
+  // Date range state
+  const today = new Date();
+  const oneYearAgo = new Date(today);
+  oneYearAgo.setFullYear(today.getFullYear() - 1);
+  const defaultStart = oneYearAgo.toISOString().split('T')[0];
+  const defaultEnd = today.toISOString().split('T')[0];
+  const minAllowedDate = '1600-01-01';
+  const maxAllowedDate = defaultEnd;
+  const [startDate, setStartDate] = useState(defaultStart);
+  const [endDate, setEndDate] = useState(defaultEnd);
+  const [dateError, setDateError] = useState<string | null>(null);
 
-        const data = await response.json();
-        setBondData(data);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'An error occurred');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
-    fetchData();
-  }, [selectedCorporateSeries, selectedTreasurySeries]);
+  // Validate date range
+  useEffect(() => {
+    if (!isValidISODate(startDate)) {
+      setDateError('Start date is invalid. Please enter a valid date (YYYY-MM-DD).');
+    } else if (!isValidISODate(endDate)) {
+      setDateError('End date is invalid. Please enter a valid date (YYYY-MM-DD).');
+    } else if (startDate < minAllowedDate || startDate > maxAllowedDate) {
+      setDateError(`Start date must be between ${minAllowedDate} and ${maxAllowedDate}.`);
+    } else if (endDate < minAllowedDate || endDate > maxAllowedDate) {
+      setDateError(`End date must be between ${minAllowedDate} and ${maxAllowedDate}.`);
+    } else if (new Date(startDate) > new Date(endDate)) {
+      setDateError('Start date must be before end date.');
+    } else {
+      setDateError(null);
+    }
+  }, [startDate, endDate]);
+
+  // Debounced fetch effect for date range and series changes
+  useEffect(() => {
+    if (dateError) return;
+    const handler = setTimeout(() => {
+      const fetchData = async () => {
+        try {
+          setIsLoading(true);
+          setError(null);
+          const queryParams = new URLSearchParams({
+            series: selectedCorporateSeries,
+            treasury: selectedTreasurySeries,
+            start: startDate,
+            end: endDate
+          });
+          const response = await fetch(`/api/bonds?${queryParams.toString()}`);
+          if (!response.ok) {
+            throw new Error('Failed to fetch bond data');
+          }
+          const data = await response.json();
+          setBondData(data);
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'An error occurred');
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      fetchData();
+    }, 500); // 500ms debounce
+    return () => clearTimeout(handler);
+  }, [selectedCorporateSeries, selectedTreasurySeries, startDate, endDate, dateError]);
 
   if (error) {
     return (
       <div className="flex items-center justify-center h-screen">
         <p className="text-red-500">Error: {error}</p>
-      </div>
-    );
-  }
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <p className="text-gray-500">Loading...</p>
       </div>
     );
   }
@@ -221,10 +252,38 @@ export default function BondsPage() {
           </div>
         </div>
 
+        {/* Date Range Selection */}
+        <div className="w-full max-w-6xl mx-auto my-6 flex flex-col md:flex-row items-center gap-4">
+          <label className="flex flex-col text-sm font-medium">
+            Start Date
+            <input
+              type="date"
+              value={startDate}
+              max={endDate}
+              min={minAllowedDate}
+              onChange={e => setStartDate(e.target.value)}
+              className="border rounded px-2 py-1 mt-1"
+            />
+          </label>
+          <span className="mx-2">to</span>
+          <label className="flex flex-col text-sm font-medium">
+            End Date
+            <input
+              type="date"
+              value={endDate}
+              min={startDate}
+              max={maxAllowedDate}
+              onChange={e => setEndDate(e.target.value)}
+              className="border rounded px-2 py-1 mt-1"
+            />
+          </label>
+          {dateError && <div className="text-red-600 text-sm mb-2">{dateError}</div>}
+        </div>
+
         <Card className="bg-white shadow-md">
           <div style={{ width: '100%', minHeight: '500px', background: 'white' }}>
             <ErrorBoundary>
-              <BondChart data={bondData?.chartData || []} />
+              <BondChart data={bondData?.chartData || []} disableDateFilter />
             </ErrorBoundary>
           </div>
         </Card>

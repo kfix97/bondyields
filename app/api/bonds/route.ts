@@ -30,9 +30,11 @@ export async function GET(request: Request) {
     console.log('Corporate Series:', corporateSeries);
     console.log('Treasury Series:', treasurySeries);
     
-    // Calculate dates for one year range
-    const endDate = new Date().toISOString().split('T')[0];
-    const startDate = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    // Calculate dates for one year range or use query params
+    const endParam = searchParams.get('end');
+    const startParam = searchParams.get('start');
+    const endDate = endParam || new Date().toISOString().split('T')[0];
+    const startDate = startParam || new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
     console.log('Start Date:', startDate);
     console.log('End Date:', endDate);
