@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 
 const Chart = dynamic(() => import('./Chart'), { ssr: false });
@@ -73,8 +73,8 @@ export default function BondChart({ data, disableDateFilter = false }: BondChart
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
   // minDate and maxDate are derived from startDate and endDate state
-  const minDate = startDate ? new Date(startDate) : new Date();
-  const maxDate = endDate ? new Date(endDate) : new Date();
+  const minDate = useMemo(() => startDate ? new Date(startDate) : new Date(), [startDate]);
+  const maxDate = useMemo(() => endDate ? new Date(endDate) : new Date(), [endDate]);
 
   // All useEffect hooks must be called before any conditional returns
   // Update startDate and endDate when treasuryData changes

@@ -3,7 +3,7 @@
 import { Card, Title, Text } from '@tremor/react';
 import BondChart from './components/BondChart';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 
 // Series data for corporate bond options
 const corporateSeriesData = [
@@ -103,7 +103,6 @@ export default function BondsPage() {
       source: string;
     }>;
   } | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   // Date range state
@@ -133,7 +132,7 @@ export default function BondsPage() {
     } else {
       setDateError(null);
     }
-  }, [startDate, endDate]);
+  }, [startDate, endDate, minAllowedDate, maxAllowedDate]);
 
   // Debounced fetch effect for date range and series changes
   useEffect(() => {
@@ -141,7 +140,6 @@ export default function BondsPage() {
     const handler = setTimeout(() => {
       const fetchData = async () => {
         try {
-          setIsLoading(true);
           setError(null);
           const queryParams = new URLSearchParams({
             series: selectedCorporateSeries,
@@ -157,8 +155,6 @@ export default function BondsPage() {
           setBondData(data);
         } catch (err) {
           setError(err instanceof Error ? err.message : 'An error occurred');
-        } finally {
-          setIsLoading(false);
         }
       };
       fetchData();
