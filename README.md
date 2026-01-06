@@ -7,3 +7,5 @@ A widening spread typically signals increased market concern about corporate cre
 Site available at https://bondyields.vercel.app/
 
 Built with help from Cursor and Mike Osborne
+
+For new instances, create a .env.local file in the root project directiry with FRED_API_KEY=(insert your fred api key here)

@@ -249,7 +249,7 @@ export default function BondsPage() {
         </div>
 
         {/* Date Range Selection */}
-        <div className="w-full max-w-6xl mx-auto my-6 flex flex-col md:flex-row items-center gap-4">
+        <div className="w-full max-w-6xl mx-auto my-6 flex flex-col md:flex-row items-center justify-center gap-4">
           <label className="flex flex-col text-sm font-medium text-black">
             Start Date
             <input
