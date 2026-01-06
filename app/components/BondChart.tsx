@@ -128,7 +128,7 @@ export default function BondChart({ data, disableDateFilter = false }: BondChart
     lastKnownCorporateYield = filteredCorporateData[0].yield;
   }
 
-  // Fill in all business days with interpolated values
+  // Fill in all business days with interpolated values for corporate yields
   businessDays.forEach(date => {
     const dateStr = date.toISOString().split('T')[0];
     const actualDataPoint = corporateData.find(d => d.date === dateStr);
@@ -140,25 +140,68 @@ export default function BondChart({ data, disableDateFilter = false }: BondChart
     }
   });
 
+  // Create a map of treasury yields with forward-filling logic
+  const treasuryYieldMap = new Map<string, number>();
+  let lastKnownTreasuryYield: number | null = null;
+
+  // Initialize with the first valid treasury yield in range
+  const filteredTreasuryData = treasuryData.filter(d => new Date(d.date) >= selectedStart && new Date(d.date) <= selectedEnd);
+  if (filteredTreasuryData.length > 0) {
+    lastKnownTreasuryYield = filteredTreasuryData[0].yield;
+  }
+
+  // Fill in all business days with interpolated values for treasury yields
+  businessDays.forEach(date => {
+    const dateStr = date.toISOString().split('T')[0];
+    const actualDataPoint = treasuryData.find(d => d.date === dateStr);
+    if (actualDataPoint && actualDataPoint.yield !== null) {
+      treasuryYieldMap.set(dateStr, actualDataPoint.yield);
+      lastKnownTreasuryYield = actualDataPoint.yield;
+    } else if (lastKnownTreasuryYield !== null) {
+      treasuryYieldMap.set(dateStr, lastKnownTreasuryYield);
+    }
+  });
+
   // Create the combined dataset using only business days in range
   const combinedData = businessDays.map(date => {
     const dateStr = date.toISOString().split('T')[0];
-    const treasuryPoint = treasuryData.find(d => d.date === dateStr);
+    const treasuryYield = treasuryYieldMap.get(dateStr);
     const corporateYield = corporateYieldMap.get(dateStr);
-    const spread = (corporateYield && treasuryPoint?.yield)
-      ? (corporateYield - treasuryPoint.yield) * 100 // Convert to basis points
+    const spread = (corporateYield !== undefined && treasuryYield !== undefined)
+      ? (corporateYield - treasuryYield) * 100 // Convert to basis points
       : null;
     return {
       date: dateStr,
       formattedDate: formatDate(dateStr),
-      treasury_yield: treasuryPoint?.yield || null,
-      corporate_yield: corporateYield || null,
+      treasury_yield: treasuryYield !== undefined ? treasuryYield : null,
+      corporate_yield: corporateYield !== undefined ? corporateYield : null,
       spread_yield: spread
     };
   }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-  // Get the latest values
-  const latestData = combinedData[combinedData.length - 1];
+  // Get the latest values - find the most recent data point with actual data
+  // Prioritize finding a point with both treasury and corporate yields, but fall back to what's available
+  let latestData = combinedData[combinedData.length - 1];
+  
+  // First, try to find the latest point with both treasury and corporate yields
+  for (let i = combinedData.length - 1; i >= 0; i--) {
+    const dataPoint = combinedData[i];
+    if (dataPoint.treasury_yield !== null && dataPoint.corporate_yield !== null) {
+      latestData = dataPoint;
+      break;
+    }
+  }
+  
+  // If no point has both, find the latest point with at least treasury yield (for display)
+  if (latestData.treasury_yield === null) {
+    for (let i = combinedData.length - 1; i >= 0; i--) {
+      const dataPoint = combinedData[i];
+      if (dataPoint.treasury_yield !== null) {
+        latestData = dataPoint;
+        break;
+      }
+    }
+  }
 
   if (!data || data.length === 0) {
     return (
@@ -215,7 +258,9 @@ export default function BondChart({ data, disableDateFilter = false }: BondChart
           <div className="p-4 rounded-lg bg-indigo-50">
             <h4 className="text-sm font-medium text-indigo-900 mb-1">Treasury Yield</h4>
             <p className="text-2xl font-bold text-indigo-700 mb-1">
-              {latestData?.treasury_yield?.toFixed(2)}%
+              {latestData?.treasury_yield !== null && latestData?.treasury_yield !== undefined
+                ? `${latestData.treasury_yield.toFixed(2)}%`
+                : 'N/A'}
             </p>
             <p className="text-xs text-indigo-600">
               as of {latestData ? formatDisplayDate(latestData.date) : ''}
@@ -224,7 +269,9 @@ export default function BondChart({ data, disableDateFilter = false }: BondChart
           <div className="p-4 rounded-lg bg-green-50">
             <h4 className="text-sm font-medium text-green-900 mb-1">Corporate Yield</h4>
             <p className="text-2xl font-bold text-green-700 mb-1">
-              {latestData?.corporate_yield?.toFixed(2)}%
+              {latestData?.corporate_yield !== null && latestData?.corporate_yield !== undefined
+                ? `${latestData.corporate_yield.toFixed(2)}%`
+                : 'N/A'}
             </p>
             <p className="text-xs text-green-600">
               as of {latestData ? formatDisplayDate(latestData.date) : ''}
@@ -233,7 +280,9 @@ export default function BondChart({ data, disableDateFilter = false }: BondChart
           <div className="p-4 rounded-lg bg-red-50">
             <h4 className="text-sm font-medium text-red-900 mb-1">Spread</h4>
             <p className="text-2xl font-bold text-red-700 mb-1">
-              {latestData?.spread_yield?.toFixed(0)} bps
+              {latestData?.spread_yield !== null && latestData?.spread_yield !== undefined
+                ? `${latestData.spread_yield.toFixed(0)} bps`
+                : 'N/A'}
             </p>
             <p className="text-xs text-red-600">
               as of {latestData ? formatDisplayDate(latestData.date) : ''}
