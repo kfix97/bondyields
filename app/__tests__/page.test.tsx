@@ -5,7 +5,7 @@ import BondsPage from '../page';
 
 // Mock the components
 jest.mock('../components/BondChart', () => {
-  return function MockBondChart({ data }: { data: any[] }) {
+  return function MockBondChart({ data }: { data: Array<{ date: string; yield: number | null; source: string }> }) {
     return <div data-testid="bond-chart">{data.length} data points</div>;
   };
 });

@@ -1,11 +1,17 @@
 import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import BondChart from '../BondChart';
+
+interface ChartDataPoint {
+  date: string;
+  treasury_yield: number | null;
+  corporate_yield: number | null;
+  spread_yield: number | null;
+}
 
 // Mock the Chart component
 jest.mock('../Chart', () => {
-  return function MockChart({ data }: { data: any[] }) {
+  return function MockChart({ data }: { data: ChartDataPoint[] }) {
     return <div data-testid="chart">{data.length} data points</div>;
   };
 });
@@ -212,9 +218,10 @@ describe('BondChart', () => {
   });
 
   it('should display N/A when yield values are null', async () => {
-    const dataWithNulls = [
-      { date: '2023-01-02', yield: null as any, source: 'Treasury' },
-      { date: '2023-01-02', yield: null as any, source: 'Corporate' },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const dataWithNulls: any[] = [
+      { date: '2023-01-02', yield: null, source: 'Treasury' },
+      { date: '2023-01-02', yield: null, source: 'Corporate' },
     ];
 
     render(<BondChart data={dataWithNulls} />);

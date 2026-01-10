@@ -1,13 +1,13 @@
 import { GET } from '../route';
-import { NextResponse } from 'next/server';
-import axios, { AxiosError } from 'axios';
+import axios from 'axios';
 
 // Polyfill Request for Node.js environment  
 if (typeof global.Request === 'undefined') {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (global as any).Request = class Request {
     url: string;
     constructor(input: string | Request, init?: RequestInit) {
-      this.url = typeof input === 'string' ? input : (input as any).url;
+      this.url = typeof input === 'string' ? input : (input as Request).url;
     }
   };
 }
@@ -17,7 +17,8 @@ jest.mock('axios');
 const mockedAxios = axios as jest.Mocked<typeof axios>;
 
 // Mock NextResponse to return proper Response-like object
-const createMockResponse = (body: any, init?: { status?: number }) => {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const createMockResponse = (body: unknown, init?: { status?: number }) => {
   return {
     json: async () => body,
     status: init?.status || 200,
@@ -134,7 +135,7 @@ describe('/api/bonds', () => {
       const data = await response.json();
 
       expect(data.chartData).toHaveLength(4); // Only valid values
-      expect(data.chartData.every((item: any) => item.yield !== null)).toBe(true);
+      expect(data.chartData.every((item: { yield: number | null }) => item.yield !== null)).toBe(true);
     });
 
     it('should use custom start and end dates from query params', async () => {
@@ -198,7 +199,7 @@ describe('/api/bonds', () => {
       const response = await GET(request);
       const data = await response.json();
 
-      const dates = data.chartData.map((item: any) => item.date);
+      const dates = data.chartData.map((item: { date: string }) => item.date);
       expect(dates).toEqual(['2023-01-01', '2023-01-02', '2023-01-03', '2023-01-04']);
     });
 
@@ -206,19 +207,21 @@ describe('/api/bonds', () => {
       // Create an error that mimics AxiosError structure
       // Note: instanceof checks may fail in test environment, so we test error handling generally
       const error = new Error('Request failed');
-      (error as any).response = {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const axiosErrorLike = error as any;
+      axiosErrorLike.response = {
         status: 500,
         statusText: 'Internal Server Error',
         data: { error: 'API Error' },
       };
-      (error as any).config = {
+      axiosErrorLike.config = {
         url: 'https://api.stlouisfed.org/fred/series/observations',
         method: 'get',
       };
-      (error as any).isAxiosError = true;
-      (error as any).name = 'AxiosError';
+      axiosErrorLike.isAxiosError = true;
+      axiosErrorLike.name = 'AxiosError';
 
-      mockedAxios.get.mockRejectedValueOnce(error);
+      mockedAxios.get.mockRejectedValueOnce(axiosErrorLike);
 
       const request = new Request('http://localhost/api/bonds?series=AAA&treasury=DGS10');
       const response = await GET(request);
