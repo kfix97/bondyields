@@ -6,6 +6,7 @@ if (typeof global.Request === 'undefined') {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (global as any).Request = class Request {
     url: string;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     constructor(input: string | Request, init?: RequestInit) {
       this.url = typeof input === 'string' ? input : (input as Request).url;
     }
@@ -17,7 +18,6 @@ jest.mock('axios');
 const mockedAxios = axios as jest.Mocked<typeof axios>;
 
 // Mock NextResponse to return proper Response-like object
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const createMockResponse = (body: unknown, init?: { status?: number }) => {
   return {
     json: async () => body,
