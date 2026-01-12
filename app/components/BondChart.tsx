@@ -181,24 +181,26 @@ export default function BondChart({ data, disableDateFilter = false }: BondChart
 
   // Get the latest values - find the most recent data point with actual data
   // Prioritize finding a point with both treasury and corporate yields, but fall back to what's available
-  let latestData = combinedData[combinedData.length - 1];
+  let latestData = combinedData.length > 0 ? combinedData[combinedData.length - 1] : null;
   
   // First, try to find the latest point with both treasury and corporate yields
-  for (let i = combinedData.length - 1; i >= 0; i--) {
-    const dataPoint = combinedData[i];
-    if (dataPoint.treasury_yield !== null && dataPoint.corporate_yield !== null) {
-      latestData = dataPoint;
-      break;
-    }
-  }
-  
-  // If no point has both, find the latest point with at least treasury yield (for display)
-  if (latestData.treasury_yield === null) {
+  if (latestData) {
     for (let i = combinedData.length - 1; i >= 0; i--) {
       const dataPoint = combinedData[i];
-      if (dataPoint.treasury_yield !== null) {
+      if (dataPoint.treasury_yield !== null && dataPoint.corporate_yield !== null) {
         latestData = dataPoint;
         break;
+      }
+    }
+    
+    // If no point has both, find the latest point with at least treasury yield (for display)
+    if (latestData && latestData.treasury_yield === null) {
+      for (let i = combinedData.length - 1; i >= 0; i--) {
+        const dataPoint = combinedData[i];
+        if (dataPoint.treasury_yield !== null) {
+          latestData = dataPoint;
+          break;
+        }
       }
     }
   }
@@ -258,7 +260,7 @@ export default function BondChart({ data, disableDateFilter = false }: BondChart
           <div className="p-4 rounded-lg bg-indigo-50">
             <h4 className="text-sm font-medium text-indigo-900 mb-1">Treasury Yield</h4>
             <p className="text-2xl font-bold text-indigo-700 mb-1">
-              {latestData?.treasury_yield !== null && latestData?.treasury_yield !== undefined
+              {latestData && latestData.treasury_yield !== null && latestData.treasury_yield !== undefined
                 ? `${latestData.treasury_yield.toFixed(2)}%`
                 : 'N/A'}
             </p>
@@ -269,7 +271,7 @@ export default function BondChart({ data, disableDateFilter = false }: BondChart
           <div className="p-4 rounded-lg bg-green-50">
             <h4 className="text-sm font-medium text-green-900 mb-1">Corporate Yield</h4>
             <p className="text-2xl font-bold text-green-700 mb-1">
-              {latestData?.corporate_yield !== null && latestData?.corporate_yield !== undefined
+              {latestData && latestData.corporate_yield !== null && latestData.corporate_yield !== undefined
                 ? `${latestData.corporate_yield.toFixed(2)}%`
                 : 'N/A'}
             </p>
@@ -280,7 +282,7 @@ export default function BondChart({ data, disableDateFilter = false }: BondChart
           <div className="p-4 rounded-lg bg-red-50">
             <h4 className="text-sm font-medium text-red-900 mb-1">Spread</h4>
             <p className="text-2xl font-bold text-red-700 mb-1">
-              {latestData?.spread_yield !== null && latestData?.spread_yield !== undefined
+              {latestData && latestData.spread_yield !== null && latestData.spread_yield !== undefined
                 ? `${latestData.spread_yield.toFixed(0)} bps`
                 : 'N/A'}
             </p>
