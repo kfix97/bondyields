@@ -8,4 +8,21 @@ Site available at https://bondyields.vercel.app/
 
 Built with help from Cursor and Mike Osborne
 
-For new instances, create a .env.local file in the root project directiry with FRED_API_KEY=(insert your fred api key here)
+## Environment Setup
+
+### Local Development
+Create a `.env.local` file in the root project directory with:
+```
+FRED_API_KEY=your_fred_api_key_here
+```
+
+### Vercel Deployment
+1. Go to your Vercel project settings
+2. Navigate to "Environment Variables"
+3. Add a new variable:
+   - **Name**: `FRED_API_KEY`
+   - **Value**: Your FRED API key
+   - **Environment**: Production, Preview, and Development (select all)
+4. Redeploy your application
+
+You can get a free FRED API key from: https://fred.stlouisfed.org/docs/api/api_key.html

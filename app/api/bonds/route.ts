@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
 import axios, { AxiosError } from 'axios';
 
-const FRED_API_KEY = process.env.FRED_API_KEY;
-
 interface FREDObservation {
   date: string;
   value: string;
@@ -15,7 +13,21 @@ interface BondDataPoint {
 }
 
 export async function GET(request: Request) {
+  // Read FRED API key from environment (read at runtime to support tests)
+  const FRED_API_KEY = process.env.FRED_API_KEY;
+  
   try {
+    // Check if FRED API key is configured
+    if (!FRED_API_KEY) {
+      console.error('FRED_API_KEY is not configured');
+      return NextResponse.json({
+        status: 'error',
+        message: 'FRED API key is not configured. Please set FRED_API_KEY environment variable.',
+        errorType: 'ConfigurationError',
+        timestamp: new Date().toISOString()
+      }, { status: 500 });
+    }
+
     const { searchParams } = new URL(request.url);
     const corporateSeries = searchParams.get('series');
     const treasurySeries = searchParams.get('treasury');
@@ -73,16 +85,102 @@ export async function GET(request: Request) {
       source: 'Corporate'
     })).filter((item): item is BondDataPoint => item.yield !== null);
 
-    // Combine both datasets for chart data
-    const chartData = [...fredData, ...corporateData].sort((a, b) => 
-      new Date(a.date).getTime() - new Date(b.date).getTime()
-    );
+    // Fetch the absolute latest data points (without date restrictions) to ensure we always have the most recent values
+    // Use today's date as observation_end to ensure we get the most recent available data
+    const today = new Date().toISOString().split('T')[0];
+    const latestTreasuryUrl = `https://api.stlouisfed.org/fred/series/observations?series_id=${treasurySeries}&api_key=${FRED_API_KEY}&file_type=json&sort_order=desc&limit=1&observation_end=${today}`;
+    const latestCorporateUrl = `https://api.stlouisfed.org/fred/series/observations?series_id=${corporateSeries}&api_key=${FRED_API_KEY}&file_type=json&sort_order=desc&limit=1&observation_end=${today}`;
+    
+    let absoluteLatestTreasury: BondDataPoint | null = null;
+    let absoluteLatestCorporate: BondDataPoint | null = null;
+    
+    try {
+      const latestTreasuryResponse = await axios.get<{ observations: FREDObservation[] }>(latestTreasuryUrl);
+      if (latestTreasuryResponse.data.observations && latestTreasuryResponse.data.observations.length > 0) {
+        const latest = latestTreasuryResponse.data.observations[0];
+        const yieldValue = parseFloat(latest.value);
+        if (!isNaN(yieldValue)) {
+          absoluteLatestTreasury = {
+            date: latest.date,
+            yield: yieldValue,
+            source: 'Treasury'
+          };
+          console.log('Absolute latest Treasury data:', absoluteLatestTreasury.date, absoluteLatestTreasury.yield);
+        } else {
+          console.warn('Latest Treasury data has invalid yield value:', latest.value);
+        }
+      } else {
+        console.warn('No observations returned for latest Treasury data');
+      }
+    } catch (error) {
+      console.error('Failed to fetch absolute latest Treasury data:', error);
+    }
+    
+    try {
+      const latestCorporateResponse = await axios.get<{ observations: FREDObservation[] }>(latestCorporateUrl);
+      if (latestCorporateResponse.data.observations && latestCorporateResponse.data.observations.length > 0) {
+        const latest = latestCorporateResponse.data.observations[0];
+        const yieldValue = parseFloat(latest.value);
+        if (!isNaN(yieldValue)) {
+          absoluteLatestCorporate = {
+            date: latest.date,
+            yield: yieldValue,
+            source: 'Corporate'
+          };
+          console.log('Absolute latest Corporate data:', absoluteLatestCorporate.date, absoluteLatestCorporate.yield);
+        } else {
+          console.warn('Latest Corporate data has invalid yield value:', latest.value);
+        }
+      } else {
+        console.warn('No observations returned for latest Corporate data');
+      }
+    } catch (error) {
+      console.error('Failed to fetch absolute latest Corporate data:', error);
+    }
 
-    // Format the response
+    // Combine both datasets for chart data
+    const chartData = [...fredData, ...corporateData];
+    
+    // Add the absolute latest data points if they're not already in the chartData
+    if (absoluteLatestTreasury) {
+      const exists = chartData.some(d => d.date === absoluteLatestTreasury!.date && d.source === 'Treasury');
+      if (!exists) {
+        chartData.push(absoluteLatestTreasury);
+        console.log('Added absolute latest Treasury data to chartData:', absoluteLatestTreasury.date);
+      } else {
+        console.log('Absolute latest Treasury data already exists in chartData:', absoluteLatestTreasury.date);
+      }
+    } else {
+      console.warn('No absolute latest Treasury data available');
+    }
+    
+    if (absoluteLatestCorporate) {
+      const exists = chartData.some(d => d.date === absoluteLatestCorporate!.date && d.source === 'Corporate');
+      if (!exists) {
+        chartData.push(absoluteLatestCorporate);
+        console.log('Added absolute latest Corporate data to chartData:', absoluteLatestCorporate.date);
+      } else {
+        console.log('Absolute latest Corporate data already exists in chartData:', absoluteLatestCorporate.date);
+      }
+    } else {
+      console.warn('No absolute latest Corporate data available');
+    }
+    
+    // Sort the combined data
+    chartData.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    
+    // Log the date range of chartData for debugging
+    if (chartData.length > 0) {
+      const dates = chartData.map(d => d.date).sort();
+      console.log('ChartData date range:', dates[0], 'to', dates[dates.length - 1]);
+      console.log('Total data points in chartData:', chartData.length);
+    }
+
+    // Format the response - use absolute latest if available, otherwise fall back to filtered latest
     const formattedResponse = {
       latestData: {
-        treasury: fredData[fredData.length - 1], // Get the most recent data point
-        corporate: corporateData[corporateData.length - 1]
+        treasury: absoluteLatestTreasury || (fredData.length > 0 ? fredData[fredData.length - 1] : null),
+        corporate: absoluteLatestCorporate || (corporateData.length > 0 ? corporateData[corporateData.length - 1] : null)
       },
       chartData
     };
@@ -102,14 +200,51 @@ export async function GET(request: Request) {
       stack: error instanceof Error ? error.stack : undefined
     });
 
-    if (error instanceof AxiosError) {
+    // Check for AxiosError using both instanceof and isAxiosError property
+    // (isAxiosError property is needed for test environments where instanceof may fail)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const isAxiosError = error instanceof AxiosError || (error as any)?.isAxiosError === true;
+    
+    if (isAxiosError) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const axiosError = error as any;
       console.error('Axios Error Details:', {
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        data: error.response?.data,
-        url: error.config?.url?.replace(FRED_API_KEY || '', 'HIDDEN_KEY'),
-        method: error.config?.method
+        status: axiosError.response?.status,
+        statusText: axiosError.response?.statusText,
+        data: axiosError.response?.data,
+        url: axiosError.config?.url?.replace(FRED_API_KEY || '', 'HIDDEN_KEY'),
+        method: axiosError.config?.method
       });
+
+      // Handle specific HTTP status codes
+      if (axiosError.response?.status === 403) {
+        return NextResponse.json({
+          status: 'error',
+          message: 'FRED API access denied. Please check that FRED_API_KEY is set correctly in your environment variables.',
+          errorType: 'AxiosError',
+          httpStatus: 403,
+          timestamp: new Date().toISOString()
+        }, { status: 500 });
+      }
+
+      if (axiosError.response?.status === 400) {
+        return NextResponse.json({
+          status: 'error',
+          message: 'Invalid request to FRED API. Please check the series IDs and date range.',
+          errorType: 'AxiosError',
+          httpStatus: 400,
+          timestamp: new Date().toISOString()
+        }, { status: 400 });
+      }
+
+      // For other AxiosErrors, return the error message with AxiosError type
+      return NextResponse.json({
+        status: 'error',
+        message: axiosError.message || 'Request failed',
+        errorType: 'AxiosError',
+        httpStatus: axiosError.response?.status,
+        timestamp: new Date().toISOString()
+      }, { status: 500 });
     }
 
     return NextResponse.json({
