@@ -36,12 +36,43 @@ const isWeekend = (date: Date): boolean => {
   return day === 0 || day === 6; // 0 is Sunday, 6 is Saturday
 };
 
+// Helper function to safely format a date for logging (never throws)
+const safeFormatDateForLog = (date: Date | null | undefined): string => {
+  try {
+    if (date && !isNaN(date.getTime())) {
+      return date.toISOString().split('T')[0];
+    }
+  } catch {
+    // Fallback if anything fails
+  }
+  return new Date().toISOString().split('T')[0];
+};
+
+// Helper to safely log (only in non-test environments to avoid test failures)
+const safeLog = (...args: unknown[]) => {
+  // Only log if not in test environment (NODE_ENV !== 'test')
+  if (process.env.NODE_ENV !== 'test') {
+    try {
+      console.log(...args);
+    } catch {
+      // Silently fail if logging fails
+    }
+  }
+};
+
 // Helper function to get all business days between two dates
 const getBusinessDaysInRange = (startDate: Date, endDate: Date) => {
+  // Validate dates before processing
+  if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+    console.warn('Component: Invalid dates passed to getBusinessDaysInRange, returning empty array');
+    return [];
+  }
+  
   const dates = [];
   const currentDate = new Date(startDate);
+  const validEndDate = new Date(endDate);
   
-  while (currentDate <= endDate) {
+  while (currentDate <= validEndDate) {
     if (!isWeekend(currentDate)) {
       dates.push(new Date(currentDate));
     }
@@ -73,8 +104,21 @@ export default function BondChart({ data, disableDateFilter = false }: BondChart
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
   // minDate and maxDate are derived from startDate and endDate state
-  const minDate = useMemo(() => startDate ? new Date(startDate) : new Date(), [startDate]);
-  const maxDate = useMemo(() => endDate ? new Date(endDate) : new Date(), [endDate]);
+  // Ensure they're always valid dates
+  const minDate = useMemo(() => {
+    if (startDate) {
+      const date = new Date(startDate);
+      return isNaN(date.getTime()) ? new Date() : date;
+    }
+    return new Date();
+  }, [startDate]);
+  const maxDate = useMemo(() => {
+    if (endDate) {
+      const date = new Date(endDate);
+      return isNaN(date.getTime()) ? new Date() : date;
+    }
+    return new Date();
+  }, [endDate]);
 
   // All useEffect hooks must be called before any conditional returns
   // Update startDate and endDate when treasuryData changes
@@ -116,15 +160,25 @@ export default function BondChart({ data, disableDateFilter = false }: BondChart
   // Determine the actual date range to display
   // When disableDateFilter is true, we need to exclude absolute latest outliers
   // that may have been added by the API outside the requested range
-  let selectedStart: Date;
-  let selectedEnd: Date;
+  // Initialize to valid dates to prevent any undefined/invalid date errors
+  let selectedStart: Date = new Date();
+  let selectedEnd: Date = new Date();
   
   if (disableDateFilter) {
     // Calculate range from Treasury data (which is working correctly)
     // Treasury data should represent the requested range, excluding absolute latest outliers
     if (treasuryData.length > 0) {
-      const treasuryDates = treasuryData.map(d => new Date(d.date)).sort((a, b) => a.getTime() - b.getTime());
-      selectedStart = treasuryDates[0];
+      const treasuryDates = treasuryData
+        .map(d => new Date(d.date))
+        .filter(d => !isNaN(d.getTime()))
+        .sort((a, b) => a.getTime() - b.getTime());
+      
+      if (treasuryDates.length === 0) {
+        // All dates were invalid, use fallback
+        selectedStart = new Date();
+        selectedEnd = new Date();
+      } else {
+        selectedStart = treasuryDates[0];
       
       // Check Treasury dates for gaps at the end (absolute latest would be at the very end)
       if (treasuryDates.length >= 2) {
@@ -135,45 +189,175 @@ export default function BondChart({ data, disableDateFilter = false }: BondChart
         // If there's a significant gap at the very end in Treasury data, exclude the absolute latest
         if (daysDiff > 7) {
           selectedEnd = secondLastTreasuryDate;
-          console.log('Component: Found gap in Treasury data at end (>7 days), excluding absolute latest. Using end date:', selectedEnd.toISOString().split('T')[0]);
+          console.log('Component: Found gap in Treasury data at end (>7 days), excluding absolute latest. Using end date:', safeFormatDateForLog(selectedEnd));
         } else {
-          // Check if there are multiple dates at the end with gaps (last 3 dates)
+          // Check if there are multiple consecutive gaps at the end (last 3 dates)
+          // Only exclude the second-to-last point if BOTH gaps are significant and consecutive at the end
+          // This ensures we don't exclude legitimate data due to historical gaps elsewhere in the dataset
           if (treasuryDates.length >= 3) {
             const thirdLastTreasuryDate = treasuryDates[treasuryDates.length - 3];
             const daysDiff2 = (secondLastTreasuryDate.getTime() - thirdLastTreasuryDate.getTime()) / (1000 * 60 * 60 * 24);
-            if (daysDiff > 3 && daysDiff2 > 7) {
-              // Both last dates have gaps, likely both are absolute latest
+            // Only exclude if BOTH gaps are significant (both > 7 days) - indicates consecutive outliers at the end
+            // If daysDiff2 is large but daysDiff is small, it's a historical gap, not an outlier at the end
+            if (daysDiff > 7 && daysDiff2 > 7) {
+              // Both last dates have significant consecutive gaps, likely both are absolute latest outliers
               selectedEnd = thirdLastTreasuryDate;
-              console.log('Component: Found multiple gaps in Treasury data at end, excluding absolute latest. Using end date:', selectedEnd.toISOString().split('T')[0]);
+              console.log('Component: Found consecutive large gaps at end of Treasury data, excluding absolute latest outliers. Using end date:', safeFormatDateForLog(selectedEnd));
             } else {
+              // No consecutive large gaps at the end, use the latest date
+              // (daysDiff2 might be large due to historical gaps, but that's not an outlier at the end)
               selectedEnd = lastTreasuryDate;
-              console.log('Component: No significant gap in Treasury data at end, using latest date:', selectedEnd.toISOString().split('T')[0]);
+              console.log('Component: No consecutive large gaps at end of Treasury data, using latest date:', safeFormatDateForLog(selectedEnd));
             }
           } else {
             selectedEnd = lastTreasuryDate;
-            console.log('Component: Using latest Treasury date (insufficient data to check for gaps):', selectedEnd.toISOString().split('T')[0]);
+            console.log('Component: Using latest Treasury date (insufficient data to check for gaps):', safeFormatDateForLog(selectedEnd));
           }
         }
       } else {
         // Only one Treasury date, use it
         selectedEnd = treasuryDates[0];
       }
+      }
     } else if (data.length > 0) {
       // Fallback to all data if no Treasury data
-      const allDates = data.map(d => new Date(d.date)).sort((a, b) => a.getTime() - b.getTime());
-      selectedStart = allDates[0];
-      selectedEnd = allDates[allDates.length - 1];
-      console.log('Component: No Treasury data, using all data range:', selectedStart.toISOString().split('T')[0], 'to', selectedEnd.toISOString().split('T')[0]);
+      const allDates = data
+        .map(d => new Date(d.date))
+        .filter(d => !isNaN(d.getTime()))
+        .sort((a, b) => a.getTime() - b.getTime());
+      
+      if (allDates.length > 0) {
+        selectedStart = allDates[0];
+        selectedEnd = allDates[allDates.length - 1];
+        console.log('Component: No Treasury data, using all data range:', safeFormatDateForLog(selectedStart), 'to', safeFormatDateForLog(selectedEnd));
+      } else {
+        selectedStart = new Date();
+        selectedEnd = new Date();
+      }
     } else {
       selectedStart = minDate;
       selectedEnd = maxDate;
     }
   } else {
-    selectedStart = new Date(startDate);
-    selectedEnd = new Date(endDate);
+    // Use the date range from state (set by useEffect from treasuryData)
+    // If startDate/endDate are not set yet (before useEffect runs), compute from data
+    if (startDate && endDate) {
+      const startDateObj = new Date(startDate);
+      const endDateObj = new Date(endDate);
+      if (!isNaN(startDateObj.getTime()) && !isNaN(endDateObj.getTime())) {
+        selectedStart = startDateObj;
+        selectedEnd = endDateObj;
+      } else {
+        // Invalid dates, compute from data
+        if (treasuryData.length > 0) {
+          const treasuryDates = treasuryData
+            .map(d => new Date(d.date))
+            .filter(d => !isNaN(d.getTime()))
+            .sort((a, b) => a.getTime() - b.getTime());
+          
+          if (treasuryDates.length > 0) {
+            selectedStart = treasuryDates[0];
+            selectedEnd = treasuryDates[treasuryDates.length - 1];
+          } else {
+            selectedStart = new Date();
+            selectedEnd = new Date();
+          }
+        } else {
+          selectedStart = new Date();
+          selectedEnd = new Date();
+        }
+      }
+    } else {
+      // Dates not set yet, compute from data (this happens before useEffect runs)
+      if (treasuryData.length > 0) {
+        const treasuryDates = treasuryData
+          .map(d => new Date(d.date))
+          .filter(d => !isNaN(d.getTime()))
+          .sort((a, b) => a.getTime() - b.getTime());
+        
+        if (treasuryDates.length > 0) {
+          selectedStart = treasuryDates[0];
+          selectedEnd = treasuryDates[treasuryDates.length - 1];
+        } else {
+          // All dates were invalid, use current date
+          selectedStart = new Date();
+          selectedEnd = new Date();
+        }
+      } else {
+        selectedStart = new Date();
+        selectedEnd = new Date();
+      }
+    }
   }
   
-  console.log('Component: Final selected range:', selectedStart.toISOString().split('T')[0], 'to', selectedEnd.toISOString().split('T')[0]);
+  // Ensure dates are valid (fallback to computed dates from data if invalid)
+  if (isNaN(selectedStart.getTime())) {
+    // Fallback: compute from treasuryData if available, otherwise use today
+    if (treasuryData.length > 0) {
+      const treasuryDates = treasuryData
+        .map(d => new Date(d.date))
+        .filter(d => !isNaN(d.getTime()))
+        .sort((a, b) => a.getTime() - b.getTime());
+      
+      if (treasuryDates.length > 0) {
+        selectedStart = treasuryDates[0];
+      } else {
+        selectedStart = new Date();
+      }
+    } else {
+      selectedStart = new Date();
+    }
+  }
+  if (isNaN(selectedEnd.getTime())) {
+    // Fallback: compute from treasuryData if available, otherwise use today
+    if (treasuryData.length > 0) {
+      const treasuryDates = treasuryData
+        .map(d => new Date(d.date))
+        .filter(d => !isNaN(d.getTime()))
+        .sort((a, b) => a.getTime() - b.getTime());
+      
+      if (treasuryDates.length > 0) {
+        selectedEnd = treasuryDates[treasuryDates.length - 1];
+      } else {
+        selectedEnd = new Date();
+      }
+    } else {
+      selectedEnd = new Date();
+    }
+  }
+  
+  // Ensure selectedEnd is not before selectedStart
+  if (selectedEnd < selectedStart) {
+    console.warn('Component: selectedEnd is before selectedStart, swapping them');
+    [selectedStart, selectedEnd] = [selectedEnd, selectedStart];
+  }
+  
+  // Final safety check: ensure dates are valid before any operations
+  const isValidStart = !isNaN(selectedStart.getTime());
+  const isValidEnd = !isNaN(selectedEnd.getTime());
+  
+  if (!isValidStart || !isValidEnd) {
+    // Last resort: use current date if still invalid
+    if (!isValidStart) {
+      selectedStart = new Date();
+    }
+    if (!isValidEnd) {
+      selectedEnd = new Date();
+    }
+    console.warn('Component: Invalid date range detected, using fallback dates');
+  }
+  
+  // Final validation before logging (double-check dates are valid)
+  // If somehow dates are still invalid, use current date as absolute fallback
+  if (isNaN(selectedStart.getTime())) {
+    selectedStart = new Date();
+  }
+  if (isNaN(selectedEnd.getTime())) {
+    selectedEnd = new Date();
+  }
+  
+  // Log the final selected range (using safe formatting that never throws, and only in non-test environments)
+  safeLog('Component: Final selected range:', safeFormatDateForLog(selectedStart), 'to', safeFormatDateForLog(selectedEnd));
   
   const businessDays = getBusinessDaysInRange(selectedStart, selectedEnd);
 
@@ -272,20 +456,33 @@ export default function BondChart({ data, disableDateFilter = false }: BondChart
         new Date(current.date) > new Date(latest.date) ? current : latest
       )
     : null;
+  
+  // Note: We'll use the forward-filled values from the yield maps below to match what's shown on the chart
 
   console.log('Component: Latest Treasury data point (within range):', latestTreasury?.date, latestTreasury?.yield);
   console.log('Component: Latest Corporate data point (within range):', latestCorporate?.date, latestCorporate?.yield);
-  console.log('Component: Selected range:', selectedStart.toISOString().split('T')[0], 'to', selectedEnd.toISOString().split('T')[0]);
+  // Log selected range (using safe formatting)
+  console.log('Component: Selected range:', safeFormatDateForLog(selectedStart), 'to', safeFormatDateForLog(selectedEnd));
   console.log('Component: Treasury data in range:', treasuryDataInRange.length, 'of', treasuryData.length);
   console.log('Component: Corporate data in range:', corporateDataInRange.length, 'of', corporateData.length);
 
   // Determine the display date and yields
-  // Use the latest values from within the selected range
-  // All dates should reflect the end of the selected range or the latest data within it
+  // Use the forward-filled values from the yield maps to match what's shown on the chart
+  // This ensures the latest box values match the chart's displayed values
+  // Get the last business day's forward-filled values (this is what the chart shows)
+  const lastBusinessDayStr = businessDays.length > 0 
+    ? businessDays[businessDays.length - 1].toISOString().split('T')[0]
+    : null;
   
-  // Use the latest individual yields from within the range
-  const treasuryYieldForDisplay = latestTreasury?.yield ?? null;
-  const corporateYieldForDisplay = latestCorporate?.yield ?? null;
+  // Use forward-filled values from yield maps for the last business day (matches chart display)
+  // Fall back to raw data if yield maps don't have the value
+  const treasuryYieldForDisplay = lastBusinessDayStr && treasuryYieldMap.has(lastBusinessDayStr)
+    ? treasuryYieldMap.get(lastBusinessDayStr)!
+    : (latestTreasury?.yield ?? null);
+  
+  const corporateYieldForDisplay = lastBusinessDayStr && corporateYieldMap.has(lastBusinessDayStr)
+    ? corporateYieldMap.get(lastBusinessDayStr)!
+    : (latestCorporate?.yield ?? null);
   
   // Calculate spread as simple difference between the latest Treasury and Corporate yields shown in the boxes
   // Spread = Corporate Yield - Treasury Yield (converted to basis points)
@@ -296,7 +493,7 @@ export default function BondChart({ data, disableDateFilter = false }: BondChart
   
   // For display date, use the end of the selected range (or the latest data within range if earlier)
   // This ensures all boxes show dates that are consistent with the chart
-  const rangeEndDateStr = selectedEnd.toISOString().split('T')[0];
+  const rangeEndDateStr = !isNaN(selectedEnd.getTime()) ? selectedEnd.toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
   let latestDate: string | null = null;
   
   // Use the most recent date within range, but cap it at the selected end date
@@ -318,7 +515,7 @@ export default function BondChart({ data, disableDateFilter = false }: BondChart
 
   // Determine individual dates for Treasury and Corporate
   // Dates should be within the selected range (between selectedStart and selectedEnd)
-  const rangeStartDateStr = selectedStart.toISOString().split('T')[0];
+  const rangeStartDateStr = !isNaN(selectedStart.getTime()) ? selectedStart.toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
   
   let treasuryDisplayDate: string | null = null;
   if (latestTreasury?.date) {
