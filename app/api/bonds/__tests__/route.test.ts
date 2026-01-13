@@ -262,37 +262,331 @@ describe('/api/bonds', () => {
       expect(dates).toEqual(['2023-01-01', '2023-01-02', '2023-01-03', '2023-01-04']);
     });
 
-    it('should handle axios errors gracefully', async () => {
-      // Create an error that mimics AxiosError structure
-      // Note: instanceof checks may fail in test environment, so we test error handling generally
-      const error = new Error('Request failed');
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const axiosErrorLike = error as any;
-      axiosErrorLike.response = {
-        status: 500,
-        statusText: 'Internal Server Error',
-        data: { error: 'API Error' },
-      };
-      axiosErrorLike.config = {
-        url: 'https://api.stlouisfed.org/fred/series/observations',
-        method: 'get',
-      };
-      axiosErrorLike.isAxiosError = true;
-      axiosErrorLike.name = 'AxiosError';
+    it('should handle 403 errors with specific message', async () => {
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      
+      try {
+        const error = new Error('Forbidden');
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const axiosErrorLike = error as any;
+        axiosErrorLike.response = {
+          status: 403,
+          statusText: 'Forbidden',
+          data: { error: 'Access denied' },
+        };
+        axiosErrorLike.config = {
+          url: 'https://api.stlouisfed.org/fred/series/observations',
+          method: 'get',
+        };
+        axiosErrorLike.isAxiosError = true;
+        axiosErrorLike.name = 'AxiosError';
 
-      // Mock the first axios call (Treasury date range) to fail
-      // The API makes 4 calls total, but we only need the first one to fail to test error handling
-      mockedAxios.get.mockRejectedValueOnce(axiosErrorLike);
+        mockedAxios.get.mockRejectedValueOnce(axiosErrorLike);
+
+        const request = new Request('http://localhost/api/bonds?series=AAA&treasury=DGS10');
+        const response = await GET(request);
+        const data = await response.json();
+
+        expect(response.status).toBe(500);
+        expect(data.status).toBe('error');
+        expect(data.errorType).toBe('AxiosError');
+        expect(data.httpStatus).toBe(403);
+        expect(data.message).toContain('FRED API access denied');
+      } finally {
+        consoleErrorSpy.mockRestore();
+      }
+    });
+
+    it('should handle 400 errors with specific message', async () => {
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      
+      try {
+        const error = new Error('Bad Request');
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const axiosErrorLike = error as any;
+        axiosErrorLike.response = {
+          status: 400,
+          statusText: 'Bad Request',
+          data: { error: 'Invalid parameters' },
+        };
+        axiosErrorLike.config = {
+          url: 'https://api.stlouisfed.org/fred/series/observations',
+          method: 'get',
+        };
+        axiosErrorLike.isAxiosError = true;
+        axiosErrorLike.name = 'AxiosError';
+
+        mockedAxios.get.mockRejectedValueOnce(axiosErrorLike);
+
+        const request = new Request('http://localhost/api/bonds?series=AAA&treasury=DGS10');
+        const response = await GET(request);
+        const data = await response.json();
+
+        expect(response.status).toBe(400);
+        expect(data.status).toBe('error');
+        expect(data.errorType).toBe('AxiosError');
+        expect(data.httpStatus).toBe(400);
+        expect(data.message).toContain('Invalid request to FRED API');
+      } finally {
+        consoleErrorSpy.mockRestore();
+      }
+    });
+
+    it('should handle errors when fetching latest Treasury data gracefully', async () => {
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+      
+      try {
+        const mockTreasuryData = {
+          observations: [{ date: '2023-01-01', value: '3.5' }],
+        };
+        const mockCorporateData = {
+          observations: [{ date: '2023-01-01', value: '4.5' }],
+        };
+
+        mockedAxios.get
+          .mockResolvedValueOnce({ data: mockTreasuryData, status: 200 }) // Treasury for date range
+          .mockResolvedValueOnce({ data: mockCorporateData, status: 200 }) // Corporate for date range
+          .mockRejectedValueOnce(new Error('Failed to fetch latest Treasury')) // Latest Treasury fails
+          .mockResolvedValueOnce({ data: { observations: [{ date: '2023-01-02', value: '4.6' }] }, status: 200 }); // Latest Corporate succeeds
+
+        const request = new Request('http://localhost/api/bonds?series=AAA&treasury=DGS10');
+        const response = await GET(request);
+        const data = await response.json();
+
+        expect(response.status).toBe(200);
+        expect(data.status).toBe('success');
+        // Should still return data even if latest Treasury fetch fails
+        expect(data.chartData).toBeDefined();
+      } finally {
+        consoleErrorSpy.mockRestore();
+        consoleWarnSpy.mockRestore();
+      }
+    });
+
+    it('should handle errors when fetching latest Corporate data gracefully', async () => {
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+      
+      try {
+        const mockTreasuryData = {
+          observations: [{ date: '2023-01-01', value: '3.5' }],
+        };
+        const mockCorporateData = {
+          observations: [{ date: '2023-01-01', value: '4.5' }],
+        };
+
+        mockedAxios.get
+          .mockResolvedValueOnce({ data: mockTreasuryData, status: 200 }) // Treasury for date range
+          .mockResolvedValueOnce({ data: mockCorporateData, status: 200 }) // Corporate for date range
+          .mockResolvedValueOnce({ data: { observations: [{ date: '2023-01-02', value: '3.6' }] }, status: 200 }) // Latest Treasury succeeds
+          .mockRejectedValueOnce(new Error('Failed to fetch latest Corporate')); // Latest Corporate fails
+
+        const request = new Request('http://localhost/api/bonds?series=AAA&treasury=DGS10');
+        const response = await GET(request);
+        const data = await response.json();
+
+        expect(response.status).toBe(200);
+        expect(data.status).toBe('success');
+        // Should still return data even if latest Corporate fetch fails
+        expect(data.chartData).toBeDefined();
+      } finally {
+        consoleErrorSpy.mockRestore();
+        consoleWarnSpy.mockRestore();
+      }
+    });
+
+    it('should handle invalid yield values in latest Treasury data', async () => {
+      const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+      
+      try {
+        const mockTreasuryData = {
+          observations: [{ date: '2023-01-01', value: '3.5' }],
+        };
+        const mockCorporateData = {
+          observations: [{ date: '2023-01-01', value: '4.5' }],
+        };
+
+        mockedAxios.get
+          .mockResolvedValueOnce({ data: mockTreasuryData, status: 200 }) // Treasury for date range
+          .mockResolvedValueOnce({ data: mockCorporateData, status: 200 }) // Corporate for date range
+          .mockResolvedValueOnce({ data: { observations: [{ date: '2023-01-02', value: 'invalid' }] }, status: 200 }) // Latest Treasury with invalid value
+          .mockResolvedValueOnce({ data: { observations: [{ date: '2023-01-02', value: '4.6' }] }, status: 200 }); // Latest Corporate
+
+        const request = new Request('http://localhost/api/bonds?series=AAA&treasury=DGS10');
+        const response = await GET(request);
+        const data = await response.json();
+
+        expect(response.status).toBe(200);
+        expect(data.status).toBe('success');
+        // Should still work even with invalid latest Treasury value
+        expect(data.chartData).toBeDefined();
+      } finally {
+        consoleWarnSpy.mockRestore();
+      }
+    });
+
+    it('should handle invalid yield values in latest Corporate data', async () => {
+      const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+      
+      try {
+        const mockTreasuryData = {
+          observations: [{ date: '2023-01-01', value: '3.5' }],
+        };
+        const mockCorporateData = {
+          observations: [{ date: '2023-01-01', value: '4.5' }],
+        };
+
+        mockedAxios.get
+          .mockResolvedValueOnce({ data: mockTreasuryData, status: 200 }) // Treasury for date range
+          .mockResolvedValueOnce({ data: mockCorporateData, status: 200 }) // Corporate for date range
+          .mockResolvedValueOnce({ data: { observations: [{ date: '2023-01-02', value: '3.6' }] }, status: 200 }) // Latest Treasury
+          .mockResolvedValueOnce({ data: { observations: [{ date: '2023-01-02', value: 'NaN' }] }, status: 200 }); // Latest Corporate with invalid value
+
+        const request = new Request('http://localhost/api/bonds?series=AAA&treasury=DGS10');
+        const response = await GET(request);
+        const data = await response.json();
+
+        expect(response.status).toBe(200);
+        expect(data.status).toBe('success');
+        // Should still work even with invalid latest Corporate value
+        expect(data.chartData).toBeDefined();
+      } finally {
+        consoleWarnSpy.mockRestore();
+      }
+    });
+
+    it('should handle missing observations in latest Treasury data', async () => {
+      const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+      
+      try {
+        const mockTreasuryData = {
+          observations: [{ date: '2023-01-01', value: '3.5' }],
+        };
+        const mockCorporateData = {
+          observations: [{ date: '2023-01-01', value: '4.5' }],
+        };
+
+        mockedAxios.get
+          .mockResolvedValueOnce({ data: mockTreasuryData, status: 200 }) // Treasury for date range
+          .mockResolvedValueOnce({ data: mockCorporateData, status: 200 }) // Corporate for date range
+          .mockResolvedValueOnce({ data: { observations: [] }, status: 200 }) // Latest Treasury with no observations
+          .mockResolvedValueOnce({ data: { observations: [{ date: '2023-01-02', value: '4.6' }] }, status: 200 }); // Latest Corporate
+
+        const request = new Request('http://localhost/api/bonds?series=AAA&treasury=DGS10');
+        const response = await GET(request);
+        const data = await response.json();
+
+        expect(response.status).toBe(200);
+        expect(data.status).toBe('success');
+        // Should still work even with no latest Treasury observations
+        expect(data.chartData).toBeDefined();
+      } finally {
+        consoleWarnSpy.mockRestore();
+      }
+    });
+
+    it('should handle missing observations in latest Corporate data', async () => {
+      const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+      
+      try {
+        const mockTreasuryData = {
+          observations: [{ date: '2023-01-01', value: '3.5' }],
+        };
+        const mockCorporateData = {
+          observations: [{ date: '2023-01-01', value: '4.5' }],
+        };
+
+        mockedAxios.get
+          .mockResolvedValueOnce({ data: mockTreasuryData, status: 200 }) // Treasury for date range
+          .mockResolvedValueOnce({ data: mockCorporateData, status: 200 }) // Corporate for date range
+          .mockResolvedValueOnce({ data: { observations: [{ date: '2023-01-02', value: '3.6' }] }, status: 200 }) // Latest Treasury
+          .mockResolvedValueOnce({ data: { observations: [] }, status: 200 }); // Latest Corporate with no observations
+
+        const request = new Request('http://localhost/api/bonds?series=AAA&treasury=DGS10');
+        const response = await GET(request);
+        const data = await response.json();
+
+        expect(response.status).toBe(200);
+        expect(data.status).toBe('success');
+        // Should still work even with no latest Corporate observations
+        expect(data.chartData).toBeDefined();
+      } finally {
+        consoleWarnSpy.mockRestore();
+      }
+    });
+
+    it('should handle latest data that already exists in chartData', async () => {
+      const mockTreasuryData = {
+        observations: [{ date: '2023-01-01', value: '3.5' }],
+      };
+      const mockCorporateData = {
+        observations: [{ date: '2023-01-01', value: '4.5' }],
+      };
+      // Latest data matches the date in the date range, so it should already exist
+      const mockLatestTreasury = {
+        observations: [{ date: '2023-01-01', value: '3.5' }],
+      };
+      const mockLatestCorporate = {
+        observations: [{ date: '2023-01-01', value: '4.5' }],
+      };
+
+      mockedAxios.get
+        .mockResolvedValueOnce({ data: mockTreasuryData, status: 200 }) // Treasury for date range
+        .mockResolvedValueOnce({ data: mockCorporateData, status: 200 }) // Corporate for date range
+        .mockResolvedValueOnce({ data: mockLatestTreasury, status: 200 }) // Latest Treasury (same date)
+        .mockResolvedValueOnce({ data: mockLatestCorporate, status: 200 }); // Latest Corporate (same date)
 
       const request = new Request('http://localhost/api/bonds?series=AAA&treasury=DGS10');
       const response = await GET(request);
       const data = await response.json();
 
-      expect(response.status).toBe(500);
-      expect(data.status).toBe('error');
-      expect(data.message).toBe('Request failed');
-      // Error type will be based on instanceof check - could be Error, AxiosError, or Unknown
-      expect(data.errorType).toBeTruthy();
+      expect(response.status).toBe(200);
+      expect(data.status).toBe('success');
+      // ChartData should not have duplicates
+      expect(data.chartData.length).toBe(2); // Only Treasury and Corporate, no duplicates
+    });
+
+    it('should handle axios errors gracefully', async () => {
+      // Mock console.error to suppress output during this test (CI environments may fail on console.error)
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {
+        // Suppress console.error output in tests
+      });
+
+      try {
+        // Create an error that mimics AxiosError structure
+        // Note: instanceof checks may fail in test environment, so we test error handling generally
+        const error = new Error('Request failed');
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const axiosErrorLike = error as any;
+        axiosErrorLike.response = {
+          status: 500,
+          statusText: 'Internal Server Error',
+          data: { error: 'API Error' },
+        };
+        axiosErrorLike.config = {
+          url: 'https://api.stlouisfed.org/fred/series/observations',
+          method: 'get',
+        };
+        axiosErrorLike.isAxiosError = true;
+        axiosErrorLike.name = 'AxiosError';
+
+        // Mock the first axios call (Treasury date range) to fail
+        // The API makes 4 calls total, but we only need the first one to fail to test error handling
+        mockedAxios.get.mockRejectedValueOnce(axiosErrorLike);
+
+        const request = new Request('http://localhost/api/bonds?series=AAA&treasury=DGS10');
+        const response = await GET(request);
+        const data = await response.json();
+
+        expect(response.status).toBe(500);
+        expect(data.status).toBe('error');
+        expect(data.message).toBe('Request failed');
+        expect(data.errorType).toBe('AxiosError');
+      } finally {
+        // Restore console.error after test
+        consoleErrorSpy.mockRestore();
+      }
     });
 
     it('should handle missing observations in treasury response', async () => {
