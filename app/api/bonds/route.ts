@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
 import axios, { AxiosError } from 'axios';
 
-const FRED_API_KEY = process.env.FRED_API_KEY;
-
 interface FREDObservation {
   date: string;
   value: string;
@@ -16,6 +14,20 @@ interface BondDataPoint {
 
 export async function GET(request: Request) {
   try {
+    // Read FRED API key from environment (read at runtime to support tests)
+    const FRED_API_KEY = process.env.FRED_API_KEY;
+    
+    // Check if FRED API key is configured
+    if (!FRED_API_KEY) {
+      console.error('FRED_API_KEY is not configured');
+      return NextResponse.json({
+        status: 'error',
+        message: 'FRED API key is not configured. Please set FRED_API_KEY environment variable.',
+        errorType: 'ConfigurationError',
+        timestamp: new Date().toISOString()
+      }, { status: 500 });
+    }
+
     const { searchParams } = new URL(request.url);
     const corporateSeries = searchParams.get('series');
     const treasurySeries = searchParams.get('treasury');
@@ -110,6 +122,27 @@ export async function GET(request: Request) {
         url: error.config?.url?.replace(FRED_API_KEY || '', 'HIDDEN_KEY'),
         method: error.config?.method
       });
+
+      // Handle specific HTTP status codes
+      if (error.response?.status === 403) {
+        return NextResponse.json({
+          status: 'error',
+          message: 'FRED API access denied. Please check that FRED_API_KEY is set correctly in your environment variables.',
+          errorType: 'AxiosError',
+          httpStatus: 403,
+          timestamp: new Date().toISOString()
+        }, { status: 500 });
+      }
+
+      if (error.response?.status === 400) {
+        return NextResponse.json({
+          status: 'error',
+          message: 'Invalid request to FRED API. Please check the series IDs and date range.',
+          errorType: 'AxiosError',
+          httpStatus: 400,
+          timestamp: new Date().toISOString()
+        }, { status: 400 });
+      }
     }
 
     return NextResponse.json({

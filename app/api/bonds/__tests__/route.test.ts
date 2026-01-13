@@ -50,6 +50,26 @@ describe('/api/bonds', () => {
   });
 
   describe('GET', () => {
+    it('should return 500 if FRED_API_KEY is not configured', async () => {
+      // Temporarily remove API key
+      const originalKey = process.env.FRED_API_KEY;
+      delete process.env.FRED_API_KEY;
+
+      const request = new Request('http://localhost/api/bonds?series=AAA&treasury=DGS10');
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data.status).toBe('error');
+      expect(data.errorType).toBe('ConfigurationError');
+      expect(data.message).toContain('FRED API key is not configured');
+
+      // Restore API key
+      if (originalKey) {
+        process.env.FRED_API_KEY = originalKey;
+      }
+    });
+
     it('should return 400 if series parameter is missing', async () => {
       const request = new Request('http://localhost/api/bonds?treasury=DGS10');
       const response = await GET(request);
