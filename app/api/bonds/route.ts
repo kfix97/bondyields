@@ -85,16 +85,73 @@ export async function GET(request: Request) {
       source: 'Corporate'
     })).filter((item): item is BondDataPoint => item.yield !== null);
 
-    // Combine both datasets for chart data
-    const chartData = [...fredData, ...corporateData].sort((a, b) => 
-      new Date(a.date).getTime() - new Date(b.date).getTime()
-    );
+    // Fetch the absolute latest data points (without date restrictions) to ensure we always have the most recent values
+    const latestTreasuryUrl = `https://api.stlouisfed.org/fred/series/observations?series_id=${treasurySeries}&api_key=${FRED_API_KEY}&file_type=json&sort_order=desc&limit=1`;
+    const latestCorporateUrl = `https://api.stlouisfed.org/fred/series/observations?series_id=${corporateSeries}&api_key=${FRED_API_KEY}&file_type=json&sort_order=desc&limit=1`;
+    
+    let absoluteLatestTreasury: BondDataPoint | null = null;
+    let absoluteLatestCorporate: BondDataPoint | null = null;
+    
+    try {
+      const latestTreasuryResponse = await axios.get<{ observations: FREDObservation[] }>(latestTreasuryUrl);
+      if (latestTreasuryResponse.data.observations && latestTreasuryResponse.data.observations.length > 0) {
+        const latest = latestTreasuryResponse.data.observations[0];
+        const yieldValue = parseFloat(latest.value);
+        if (!isNaN(yieldValue)) {
+          absoluteLatestTreasury = {
+            date: latest.date,
+            yield: yieldValue,
+            source: 'Treasury'
+          };
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to fetch absolute latest Treasury data:', error);
+    }
+    
+    try {
+      const latestCorporateResponse = await axios.get<{ observations: FREDObservation[] }>(latestCorporateUrl);
+      if (latestCorporateResponse.data.observations && latestCorporateResponse.data.observations.length > 0) {
+        const latest = latestCorporateResponse.data.observations[0];
+        const yieldValue = parseFloat(latest.value);
+        if (!isNaN(yieldValue)) {
+          absoluteLatestCorporate = {
+            date: latest.date,
+            yield: yieldValue,
+            source: 'Corporate'
+          };
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to fetch absolute latest Corporate data:', error);
+    }
 
-    // Format the response
+    // Combine both datasets for chart data
+    const chartData = [...fredData, ...corporateData];
+    
+    // Add the absolute latest data points if they're not already in the chartData
+    if (absoluteLatestTreasury) {
+      const exists = chartData.some(d => d.date === absoluteLatestTreasury!.date && d.source === 'Treasury');
+      if (!exists) {
+        chartData.push(absoluteLatestTreasury);
+      }
+    }
+    
+    if (absoluteLatestCorporate) {
+      const exists = chartData.some(d => d.date === absoluteLatestCorporate!.date && d.source === 'Corporate');
+      if (!exists) {
+        chartData.push(absoluteLatestCorporate);
+      }
+    }
+    
+    // Sort the combined data
+    chartData.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    // Format the response - use absolute latest if available, otherwise fall back to filtered latest
     const formattedResponse = {
       latestData: {
-        treasury: fredData[fredData.length - 1], // Get the most recent data point
-        corporate: corporateData[corporateData.length - 1]
+        treasury: absoluteLatestTreasury || (fredData.length > 0 ? fredData[fredData.length - 1] : null),
+        corporate: absoluteLatestCorporate || (corporateData.length > 0 ? corporateData[corporateData.length - 1] : null)
       },
       chartData
     };

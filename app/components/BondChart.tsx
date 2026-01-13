@@ -162,6 +162,42 @@ export default function BondChart({ data, disableDateFilter = false }: BondChart
     }
   });
 
+  // Calculate latest values from the FULL dataset (before date filtering)
+  // This ensures the latest values don't change when the date range changes
+  const latestTreasury = treasuryData.length > 0 
+    ? treasuryData.reduce((latest, current) => 
+        new Date(current.date) > new Date(latest.date) ? current : latest
+      )
+    : null;
+  
+  const latestCorporate = corporateData.length > 0
+    ? corporateData.reduce((latest, current) => 
+        new Date(current.date) > new Date(latest.date) ? current : latest
+      )
+    : null;
+
+  // Determine the latest date (use the most recent of the two)
+  let latestDate: string | null = null;
+  if (latestTreasury && latestCorporate) {
+    latestDate = new Date(latestTreasury.date) > new Date(latestCorporate.date)
+      ? latestTreasury.date
+      : latestCorporate.date;
+  } else if (latestTreasury) {
+    latestDate = latestTreasury.date;
+  } else if (latestCorporate) {
+    latestDate = latestCorporate.date;
+  }
+
+  // Create the latest data point from the absolute latest values
+  const latestData = latestDate ? {
+    date: latestDate,
+    treasury_yield: latestTreasury?.yield ?? null,
+    corporate_yield: latestCorporate?.yield ?? null,
+    spread_yield: (latestTreasury?.yield !== undefined && latestCorporate?.yield !== undefined)
+      ? (latestCorporate.yield - latestTreasury.yield) * 100 // Convert to basis points
+      : null
+  } : null;
+
   // Create the combined dataset using only business days in range
   const combinedData = businessDays.map(date => {
     const dateStr = date.toISOString().split('T')[0];
@@ -178,32 +214,6 @@ export default function BondChart({ data, disableDateFilter = false }: BondChart
       spread_yield: spread
     };
   }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-
-  // Get the latest values - find the most recent data point with actual data
-  // Prioritize finding a point with both treasury and corporate yields, but fall back to what's available
-  let latestData = combinedData.length > 0 ? combinedData[combinedData.length - 1] : null;
-  
-  // First, try to find the latest point with both treasury and corporate yields
-  if (latestData) {
-    for (let i = combinedData.length - 1; i >= 0; i--) {
-      const dataPoint = combinedData[i];
-      if (dataPoint.treasury_yield !== null && dataPoint.corporate_yield !== null) {
-        latestData = dataPoint;
-        break;
-      }
-    }
-    
-    // If no point has both, find the latest point with at least treasury yield (for display)
-    if (latestData && latestData.treasury_yield === null) {
-      for (let i = combinedData.length - 1; i >= 0; i--) {
-        const dataPoint = combinedData[i];
-        if (dataPoint.treasury_yield !== null) {
-          latestData = dataPoint;
-          break;
-        }
-      }
-    }
-  }
 
   if (!data || data.length === 0) {
     return (

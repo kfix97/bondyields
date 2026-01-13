@@ -112,9 +112,20 @@ describe('/api/bonds', () => {
         ],
       };
 
+      // Mock latest data (same as the last items in the date range for this test)
+      const mockLatestTreasury = {
+        observations: [{ date: '2023-01-02', value: '3.6' }],
+      };
+
+      const mockLatestCorporate = {
+        observations: [{ date: '2023-01-02', value: '4.6' }],
+      };
+
       mockedAxios.get
-        .mockResolvedValueOnce({ data: mockTreasuryData, status: 200 })
-        .mockResolvedValueOnce({ data: mockCorporateData, status: 200 });
+        .mockResolvedValueOnce({ data: mockTreasuryData, status: 200 }) // Treasury for date range
+        .mockResolvedValueOnce({ data: mockCorporateData, status: 200 }) // Corporate for date range
+        .mockResolvedValueOnce({ data: mockLatestTreasury, status: 200 }) // Latest Treasury
+        .mockResolvedValueOnce({ data: mockLatestCorporate, status: 200 }); // Latest Corporate
 
       const request = new Request('http://localhost/api/bonds?series=AAA&treasury=DGS10');
       const response = await GET(request);
@@ -123,10 +134,10 @@ describe('/api/bonds', () => {
       expect(response.status).toBe(200);
       expect(data.status).toBe('success');
       expect(data.message).toBe('Data fetched successfully');
-      expect(data.chartData).toHaveLength(4);
+      expect(data.chartData).toHaveLength(4); // Latest data already in range, so no duplicates
       expect(data.latestData.treasury.yield).toBe(3.6);
       expect(data.latestData.corporate.yield).toBe(4.6);
-      expect(mockedAxios.get).toHaveBeenCalledTimes(2);
+      expect(mockedAxios.get).toHaveBeenCalledTimes(4); // 2 for date range + 2 for latest
     });
 
     it('should filter out null values from observations', async () => {
@@ -146,9 +157,19 @@ describe('/api/bonds', () => {
         ],
       };
 
+      const mockLatestTreasury = {
+        observations: [{ date: '2023-01-03', value: '3.7' }],
+      };
+
+      const mockLatestCorporate = {
+        observations: [{ date: '2023-01-03', value: '4.7' }],
+      };
+
       mockedAxios.get
         .mockResolvedValueOnce({ data: mockTreasuryData, status: 200 })
-        .mockResolvedValueOnce({ data: mockCorporateData, status: 200 });
+        .mockResolvedValueOnce({ data: mockCorporateData, status: 200 })
+        .mockResolvedValueOnce({ data: mockLatestTreasury, status: 200 })
+        .mockResolvedValueOnce({ data: mockLatestCorporate, status: 200 });
 
       const request = new Request('http://localhost/api/bonds?series=AAA&treasury=DGS10');
       const response = await GET(request);
@@ -161,10 +182,14 @@ describe('/api/bonds', () => {
     it('should use custom start and end dates from query params', async () => {
       const mockTreasuryData = { observations: [{ date: '2023-06-01', value: '3.5' }] };
       const mockCorporateData = { observations: [{ date: '2023-06-01', value: '4.5' }] };
+      const mockLatestTreasury = { observations: [{ date: '2023-06-01', value: '3.5' }] };
+      const mockLatestCorporate = { observations: [{ date: '2023-06-01', value: '4.5' }] };
 
       mockedAxios.get
         .mockResolvedValueOnce({ data: mockTreasuryData, status: 200 })
-        .mockResolvedValueOnce({ data: mockCorporateData, status: 200 });
+        .mockResolvedValueOnce({ data: mockCorporateData, status: 200 })
+        .mockResolvedValueOnce({ data: mockLatestTreasury, status: 200 })
+        .mockResolvedValueOnce({ data: mockLatestCorporate, status: 200 });
 
       const request = new Request(
         'http://localhost/api/bonds?series=AAA&treasury=DGS10&start=2023-06-01&end=2023-06-30'
@@ -183,10 +208,14 @@ describe('/api/bonds', () => {
     it('should use default date range when start and end are not provided', async () => {
       const mockTreasuryData = { observations: [{ date: '2023-01-01', value: '3.5' }] };
       const mockCorporateData = { observations: [{ date: '2023-01-01', value: '4.5' }] };
+      const mockLatestTreasury = { observations: [{ date: '2023-01-01', value: '3.5' }] };
+      const mockLatestCorporate = { observations: [{ date: '2023-01-01', value: '4.5' }] };
 
       mockedAxios.get
         .mockResolvedValueOnce({ data: mockTreasuryData, status: 200 })
-        .mockResolvedValueOnce({ data: mockCorporateData, status: 200 });
+        .mockResolvedValueOnce({ data: mockCorporateData, status: 200 })
+        .mockResolvedValueOnce({ data: mockLatestTreasury, status: 200 })
+        .mockResolvedValueOnce({ data: mockLatestCorporate, status: 200 });
 
       const request = new Request('http://localhost/api/bonds?series=AAA&treasury=DGS10');
       await GET(request);
@@ -211,9 +240,19 @@ describe('/api/bonds', () => {
         ],
       };
 
+      const mockLatestTreasury = {
+        observations: [{ date: '2023-01-03', value: '3.5' }],
+      };
+
+      const mockLatestCorporate = {
+        observations: [{ date: '2023-01-04', value: '4.6' }],
+      };
+
       mockedAxios.get
         .mockResolvedValueOnce({ data: mockTreasuryData, status: 200 })
-        .mockResolvedValueOnce({ data: mockCorporateData, status: 200 });
+        .mockResolvedValueOnce({ data: mockCorporateData, status: 200 })
+        .mockResolvedValueOnce({ data: mockLatestTreasury, status: 200 })
+        .mockResolvedValueOnce({ data: mockLatestCorporate, status: 200 });
 
       const request = new Request('http://localhost/api/bonds?series=AAA&treasury=DGS10');
       const response = await GET(request);
