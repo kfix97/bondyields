@@ -86,8 +86,10 @@ export async function GET(request: Request) {
     })).filter((item): item is BondDataPoint => item.yield !== null);
 
     // Fetch the absolute latest data points (without date restrictions) to ensure we always have the most recent values
-    const latestTreasuryUrl = `https://api.stlouisfed.org/fred/series/observations?series_id=${treasurySeries}&api_key=${FRED_API_KEY}&file_type=json&sort_order=desc&limit=1`;
-    const latestCorporateUrl = `https://api.stlouisfed.org/fred/series/observations?series_id=${corporateSeries}&api_key=${FRED_API_KEY}&file_type=json&sort_order=desc&limit=1`;
+    // Use today's date as observation_end to ensure we get the most recent available data
+    const today = new Date().toISOString().split('T')[0];
+    const latestTreasuryUrl = `https://api.stlouisfed.org/fred/series/observations?series_id=${treasurySeries}&api_key=${FRED_API_KEY}&file_type=json&sort_order=desc&limit=1&observation_end=${today}`;
+    const latestCorporateUrl = `https://api.stlouisfed.org/fred/series/observations?series_id=${corporateSeries}&api_key=${FRED_API_KEY}&file_type=json&sort_order=desc&limit=1&observation_end=${today}`;
     
     let absoluteLatestTreasury: BondDataPoint | null = null;
     let absoluteLatestCorporate: BondDataPoint | null = null;
@@ -103,10 +105,15 @@ export async function GET(request: Request) {
             yield: yieldValue,
             source: 'Treasury'
           };
+          console.log('Absolute latest Treasury data:', absoluteLatestTreasury.date, absoluteLatestTreasury.yield);
+        } else {
+          console.warn('Latest Treasury data has invalid yield value:', latest.value);
         }
+      } else {
+        console.warn('No observations returned for latest Treasury data');
       }
     } catch (error) {
-      console.warn('Failed to fetch absolute latest Treasury data:', error);
+      console.error('Failed to fetch absolute latest Treasury data:', error);
     }
     
     try {
@@ -120,10 +127,15 @@ export async function GET(request: Request) {
             yield: yieldValue,
             source: 'Corporate'
           };
+          console.log('Absolute latest Corporate data:', absoluteLatestCorporate.date, absoluteLatestCorporate.yield);
+        } else {
+          console.warn('Latest Corporate data has invalid yield value:', latest.value);
         }
+      } else {
+        console.warn('No observations returned for latest Corporate data');
       }
     } catch (error) {
-      console.warn('Failed to fetch absolute latest Corporate data:', error);
+      console.error('Failed to fetch absolute latest Corporate data:', error);
     }
 
     // Combine both datasets for chart data
@@ -134,18 +146,35 @@ export async function GET(request: Request) {
       const exists = chartData.some(d => d.date === absoluteLatestTreasury!.date && d.source === 'Treasury');
       if (!exists) {
         chartData.push(absoluteLatestTreasury);
+        console.log('Added absolute latest Treasury data to chartData:', absoluteLatestTreasury.date);
+      } else {
+        console.log('Absolute latest Treasury data already exists in chartData:', absoluteLatestTreasury.date);
       }
+    } else {
+      console.warn('No absolute latest Treasury data available');
     }
     
     if (absoluteLatestCorporate) {
       const exists = chartData.some(d => d.date === absoluteLatestCorporate!.date && d.source === 'Corporate');
       if (!exists) {
         chartData.push(absoluteLatestCorporate);
+        console.log('Added absolute latest Corporate data to chartData:', absoluteLatestCorporate.date);
+      } else {
+        console.log('Absolute latest Corporate data already exists in chartData:', absoluteLatestCorporate.date);
       }
+    } else {
+      console.warn('No absolute latest Corporate data available');
     }
     
     // Sort the combined data
     chartData.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    
+    // Log the date range of chartData for debugging
+    if (chartData.length > 0) {
+      const dates = chartData.map(d => d.date).sort();
+      console.log('ChartData date range:', dates[0], 'to', dates[dates.length - 1]);
+      console.log('Total data points in chartData:', chartData.length);
+    }
 
     // Format the response - use absolute latest if available, otherwise fall back to filtered latest
     const formattedResponse = {
