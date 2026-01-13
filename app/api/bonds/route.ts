@@ -13,10 +13,10 @@ interface BondDataPoint {
 }
 
 export async function GET(request: Request) {
+  // Read FRED API key from environment (read at runtime to support tests)
+  const FRED_API_KEY = process.env.FRED_API_KEY;
+  
   try {
-    // Read FRED API key from environment (read at runtime to support tests)
-    const FRED_API_KEY = process.env.FRED_API_KEY;
-    
     // Check if FRED API key is configured
     if (!FRED_API_KEY) {
       console.error('FRED_API_KEY is not configured');
