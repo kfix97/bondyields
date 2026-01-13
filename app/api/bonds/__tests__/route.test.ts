@@ -280,6 +280,8 @@ describe('/api/bonds', () => {
       axiosErrorLike.isAxiosError = true;
       axiosErrorLike.name = 'AxiosError';
 
+      // Mock the first axios call (Treasury date range) to fail
+      // The API makes 4 calls total, but we only need the first one to fail to test error handling
       mockedAxios.get.mockRejectedValueOnce(axiosErrorLike);
 
       const request = new Request('http://localhost/api/bonds?series=AAA&treasury=DGS10');

@@ -200,17 +200,24 @@ export async function GET(request: Request) {
       stack: error instanceof Error ? error.stack : undefined
     });
 
-    if (error instanceof AxiosError) {
+    // Check for AxiosError using both instanceof and isAxiosError property
+    // (isAxiosError property is needed for test environments where instanceof may fail)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const isAxiosError = error instanceof AxiosError || (error as any)?.isAxiosError === true;
+    
+    if (isAxiosError) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const axiosError = error as any;
       console.error('Axios Error Details:', {
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        data: error.response?.data,
-        url: error.config?.url?.replace(FRED_API_KEY || '', 'HIDDEN_KEY'),
-        method: error.config?.method
+        status: axiosError.response?.status,
+        statusText: axiosError.response?.statusText,
+        data: axiosError.response?.data,
+        url: axiosError.config?.url?.replace(FRED_API_KEY || '', 'HIDDEN_KEY'),
+        method: axiosError.config?.method
       });
 
       // Handle specific HTTP status codes
-      if (error.response?.status === 403) {
+      if (axiosError.response?.status === 403) {
         return NextResponse.json({
           status: 'error',
           message: 'FRED API access denied. Please check that FRED_API_KEY is set correctly in your environment variables.',
@@ -220,7 +227,7 @@ export async function GET(request: Request) {
         }, { status: 500 });
       }
 
-      if (error.response?.status === 400) {
+      if (axiosError.response?.status === 400) {
         return NextResponse.json({
           status: 'error',
           message: 'Invalid request to FRED API. Please check the series IDs and date range.',
@@ -229,6 +236,15 @@ export async function GET(request: Request) {
           timestamp: new Date().toISOString()
         }, { status: 400 });
       }
+
+      // For other AxiosErrors, return the error message with AxiosError type
+      return NextResponse.json({
+        status: 'error',
+        message: axiosError.message || 'Request failed',
+        errorType: 'AxiosError',
+        httpStatus: axiosError.response?.status,
+        timestamp: new Date().toISOString()
+      }, { status: 500 });
     }
 
     return NextResponse.json({
