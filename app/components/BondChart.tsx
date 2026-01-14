@@ -467,22 +467,10 @@ export default function BondChart({ data, disableDateFilter = false }: BondChart
   console.log('Component: Corporate data in range:', corporateDataInRange.length, 'of', corporateData.length);
 
   // Determine the display date and yields
-  // Use the forward-filled values from the yield maps to match what's shown on the chart
-  // This ensures the latest box values match the chart's displayed values
-  // Get the last business day's forward-filled values (this is what the chart shows)
-  const lastBusinessDayStr = businessDays.length > 0 
-    ? businessDays[businessDays.length - 1].toISOString().split('T')[0]
-    : null;
-  
-  // Use forward-filled values from yield maps for the last business day (matches chart display)
-  // Fall back to raw data if yield maps don't have the value
-  const treasuryYieldForDisplay = lastBusinessDayStr && treasuryYieldMap.has(lastBusinessDayStr)
-    ? treasuryYieldMap.get(lastBusinessDayStr)!
-    : (latestTreasury?.yield ?? null);
-  
-  const corporateYieldForDisplay = lastBusinessDayStr && corporateYieldMap.has(lastBusinessDayStr)
-    ? corporateYieldMap.get(lastBusinessDayStr)!
-    : (latestCorporate?.yield ?? null);
+  // Use the actual latest data points (not forward-filled values) for the latest yield display
+  // This ensures we show the most recent actual data point, not an interpolated value
+  const treasuryYieldForDisplay = latestTreasury?.yield ?? null;
+  const corporateYieldForDisplay = latestCorporate?.yield ?? null;
   
   // Calculate spread as simple difference between the latest Treasury and Corporate yields shown in the boxes
   // Spread = Corporate Yield - Treasury Yield (converted to basis points)
