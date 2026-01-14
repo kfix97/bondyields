@@ -74,9 +74,19 @@ export async function GET(request: Request) {
     
     const corporateResponse = await axios.get<{ observations: FREDObservation[] }>(corporateUrl);
     console.log('FRED Corporate API Response Status:', corporateResponse.status);
+    console.log('FRED Corporate API - Total observations received:', corporateResponse.data.observations?.length || 0);
 
     if (!corporateResponse.data.observations) {
       throw new Error('No observations found in FRED response for Corporate data');
+    }
+
+    // Log the last few raw observations from FRED (before filtering)
+    if (corporateResponse.data.observations.length > 0) {
+      const lastFewRaw = corporateResponse.data.observations.slice(-5);
+      console.log('Last 5 raw FRED corporate observations (before filtering):');
+      lastFewRaw.forEach(obs => {
+        console.log(`  Date: ${obs.date}, Raw Value: ${obs.value}`);
+      });
     }
 
     const corporateData = corporateResponse.data.observations.map((item: FREDObservation): BondDataPoint => ({
@@ -84,6 +94,15 @@ export async function GET(request: Request) {
       yield: parseFloat(item.value) || null,
       source: 'Corporate'
     })).filter((item): item is BondDataPoint => item.yield !== null);
+
+    // Log the last few corporate data points from the date-range query
+    if (corporateData.length > 0) {
+      const lastFew = corporateData.slice(-5);
+      console.log('Last 5 corporate data points from date-range query:');
+      lastFew.forEach(point => {
+        console.log(`  Date: ${point.date}, Yield: ${point.yield}`);
+      });
+    }
 
     // Fetch the absolute latest data points (without date restrictions) to ensure we always have the most recent values
     // Use today's date as observation_end to ensure we get the most recent available data
@@ -184,6 +203,30 @@ export async function GET(request: Request) {
       },
       chartData
     };
+
+    // Log what's being returned in latestData
+    console.log('=== LATEST DATA BEING RETURNED ===');
+    console.log('Latest Corporate Data:', formattedResponse.latestData.corporate ? {
+      date: formattedResponse.latestData.corporate.date,
+      yield: formattedResponse.latestData.corporate.yield,
+      source: formattedResponse.latestData.corporate.source
+    } : 'null');
+    console.log('Latest Treasury Data:', formattedResponse.latestData.treasury ? {
+      date: formattedResponse.latestData.treasury.date,
+      yield: formattedResponse.latestData.treasury.yield,
+      source: formattedResponse.latestData.treasury.source
+    } : 'null');
+    
+    // Log the last few data points in chartData for corporate
+    const corporateChartData = chartData.filter(d => d.source === 'Corporate').sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    if (corporateChartData.length > 0) {
+      const lastFewChart = corporateChartData.slice(-5);
+      console.log('Last 5 corporate data points in chartData:');
+      lastFewChart.forEach(point => {
+        console.log(`  Date: ${point.date}, Yield: ${point.yield}`);
+      });
+    }
+    console.log('==================================');
 
     console.log('Successfully processed bond data');
 

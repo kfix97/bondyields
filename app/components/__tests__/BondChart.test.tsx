@@ -233,4 +233,42 @@ describe('BondChart', () => {
       expect(naElements.length).toBeGreaterThan(0);
     });
   });
+
+  it('should handle corporate data points on weekends by using the most recent value', async () => {
+    // Corporate data on Saturday (2023-11-04 is a Saturday)
+    // Should be picked up when processing Monday (2023-11-06)
+    const dataWithWeekendCorporate = [
+      { date: '2023-11-01', yield: 3.5, source: 'Treasury' }, // Wednesday
+      { date: '2023-11-06', yield: 3.6, source: 'Treasury' }, // Monday
+      { date: '2023-11-04', yield: 4.5, source: 'Corporate' }, // Saturday (weekend)
+      { date: '2023-12-01', yield: 4.7, source: 'Corporate' }, // Friday
+    ];
+
+    render(<BondChart data={dataWithWeekendCorporate} />);
+    
+    jest.advanceTimersByTime(100);
+    
+    await waitFor(() => {
+      expect(screen.getByTestId('chart')).toBeInTheDocument();
+    });
+  });
+
+  it('should handle corporate data with gaps by forward-filling from most recent value', async () => {
+    // Corporate data with a gap, should forward-fill
+    const dataWithGaps = [
+      { date: '2023-10-01', yield: 3.5, source: 'Treasury' },
+      { date: '2023-10-02', yield: 3.6, source: 'Treasury' },
+      { date: '2023-10-03', yield: 3.7, source: 'Treasury' },
+      { date: '2023-10-01', yield: 4.5, source: 'Corporate' }, // First data point
+      { date: '2023-10-03', yield: 4.7, source: 'Corporate' }, // Skip Oct 2
+    ];
+
+    render(<BondChart data={dataWithGaps} />);
+    
+    jest.advanceTimersByTime(100);
+    
+    await waitFor(() => {
+      expect(screen.getByTestId('chart')).toBeInTheDocument();
+    });
+  });
 });

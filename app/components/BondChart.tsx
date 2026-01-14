@@ -22,8 +22,12 @@ const formatDate = (dateStr: string) => {
 };
 
 // Helper function to format a date for display
+// Parse date string as local date to avoid timezone conversion issues
 const formatDisplayDate = (dateStr: string) => {
-  return new Date(dateStr).toLocaleDateString('en-US', {
+  // Parse YYYY-MM-DD format as local date to avoid UTC timezone conversion
+  const [year, month, day] = dateStr.split('-').map(Number);
+  const date = new Date(year, month - 1, day); // month is 0-indexed
+  return date.toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'short',
     day: 'numeric'
@@ -362,23 +366,40 @@ export default function BondChart({ data, disableDateFilter = false }: BondChart
   const businessDays = getBusinessDaysInRange(selectedStart, selectedEnd);
 
   // Create a map of corporate yields with their dates
+  // Process all corporate data points first (including those on weekends/holidays)
+  // then forward-fill business days with the most recent value
   const corporateYieldMap = new Map<string, number>();
   let lastKnownCorporateYield: number | null = null;
 
-  // Initialize with the first valid corporate yield in range
-  const filteredCorporateData = corporateData.filter(d => new Date(d.date) >= selectedStart && new Date(d.date) <= selectedEnd);
-  if (filteredCorporateData.length > 0) {
-    lastKnownCorporateYield = filteredCorporateData[0].yield;
-  }
+  // Get all corporate data points within range, sorted by date
+  const filteredCorporateData = corporateData
+    .filter(d => {
+      const date = new Date(d.date);
+      return date >= selectedStart && date <= selectedEnd;
+    })
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-  // Fill in all business days with interpolated values for corporate yields
-  businessDays.forEach(date => {
-    const dateStr = date.toISOString().split('T')[0];
-    const actualDataPoint = corporateData.find(d => d.date === dateStr);
-    if (actualDataPoint && actualDataPoint.yield > 0) {
-      corporateYieldMap.set(dateStr, actualDataPoint.yield);
-      lastKnownCorporateYield = actualDataPoint.yield;
+  // Fill in all business days with forward-filled values
+  // For each business day, use the most recent corporate data point that's <= that date
+  businessDays.forEach(businessDay => {
+    const dateStr = businessDay.toISOString().split('T')[0];
+    const businessDayTime = businessDay.getTime();
+    
+    // Find the most recent corporate data point that's <= this business day
+    let mostRecentDataPoint = null;
+    for (let i = filteredCorporateData.length - 1; i >= 0; i--) {
+      const dataPointDate = new Date(filteredCorporateData[i].date).getTime();
+      if (dataPointDate <= businessDayTime && filteredCorporateData[i].yield > 0) {
+        mostRecentDataPoint = filteredCorporateData[i];
+        break;
+      }
+    }
+    
+    if (mostRecentDataPoint) {
+      corporateYieldMap.set(dateStr, mostRecentDataPoint.yield);
+      lastKnownCorporateYield = mostRecentDataPoint.yield;
     } else if (lastKnownCorporateYield !== null) {
+      // Fallback to last known value if no data point found (shouldn't happen with filteredCorporateData, but safety check)
       corporateYieldMap.set(dateStr, lastKnownCorporateYield);
     }
   });
@@ -467,22 +488,10 @@ export default function BondChart({ data, disableDateFilter = false }: BondChart
   console.log('Component: Corporate data in range:', corporateDataInRange.length, 'of', corporateData.length);
 
   // Determine the display date and yields
-  // Use the forward-filled values from the yield maps to match what's shown on the chart
-  // This ensures the latest box values match the chart's displayed values
-  // Get the last business day's forward-filled values (this is what the chart shows)
-  const lastBusinessDayStr = businessDays.length > 0 
-    ? businessDays[businessDays.length - 1].toISOString().split('T')[0]
-    : null;
-  
-  // Use forward-filled values from yield maps for the last business day (matches chart display)
-  // Fall back to raw data if yield maps don't have the value
-  const treasuryYieldForDisplay = lastBusinessDayStr && treasuryYieldMap.has(lastBusinessDayStr)
-    ? treasuryYieldMap.get(lastBusinessDayStr)!
-    : (latestTreasury?.yield ?? null);
-  
-  const corporateYieldForDisplay = lastBusinessDayStr && corporateYieldMap.has(lastBusinessDayStr)
-    ? corporateYieldMap.get(lastBusinessDayStr)!
-    : (latestCorporate?.yield ?? null);
+  // Use the actual latest data points (not forward-filled values) for the latest yield display
+  // This ensures we show the most recent actual data point, not an interpolated value
+  const treasuryYieldForDisplay = latestTreasury?.yield ?? null;
+  const corporateYieldForDisplay = latestCorporate?.yield ?? null;
   
   // Calculate spread as simple difference between the latest Treasury and Corporate yields shown in the boxes
   // Spread = Corporate Yield - Treasury Yield (converted to basis points)
