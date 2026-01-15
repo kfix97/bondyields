@@ -199,10 +199,63 @@ describe('/api/bonds', () => {
       const treasuryCall = mockedAxios.get.mock.calls[0][0] as string;
       const corporateCall = mockedAxios.get.mock.calls[1][0] as string;
 
-      expect(treasuryCall).toContain('observation_start=2023-06-01');
+      // API now fetches one month earlier than requested start date for forward-filling continuity
+      expect(treasuryCall).toContain('observation_start=2023-05-01');
       expect(treasuryCall).toContain('observation_end=2023-06-30');
-      expect(corporateCall).toContain('observation_start=2023-06-01');
+      expect(corporateCall).toContain('observation_start=2023-05-01');
       expect(corporateCall).toContain('observation_end=2023-06-30');
+    });
+
+    it('should handle month boundary edge cases when calculating one month earlier', async () => {
+      // Test January -> December of previous year
+      const mockTreasuryData = { observations: [{ date: '2023-01-15', value: '3.5' }] };
+      const mockCorporateData = { observations: [{ date: '2023-01-15', value: '4.5' }] };
+      const mockLatestTreasury = { observations: [{ date: '2023-01-15', value: '3.5' }] };
+      const mockLatestCorporate = { observations: [{ date: '2023-01-15', value: '4.5' }] };
+
+      mockedAxios.get
+        .mockResolvedValueOnce({ data: mockTreasuryData, status: 200 })
+        .mockResolvedValueOnce({ data: mockCorporateData, status: 200 })
+        .mockResolvedValueOnce({ data: mockLatestTreasury, status: 200 })
+        .mockResolvedValueOnce({ data: mockLatestCorporate, status: 200 });
+
+      const request = new Request(
+        'http://localhost/api/bonds?series=AAA&treasury=DGS10&start=2023-01-15&end=2023-01-31'
+      );
+      await GET(request);
+
+      const treasuryCall = mockedAxios.get.mock.calls[0][0] as string;
+      const corporateCall = mockedAxios.get.mock.calls[1][0] as string;
+
+      // January 15 -> December 15 of previous year
+      expect(treasuryCall).toContain('observation_start=2022-12-15');
+      expect(corporateCall).toContain('observation_start=2022-12-15');
+    });
+
+    it('should handle end-of-month dates when calculating one month earlier', async () => {
+      // Test March 31 -> February 28/29 (handles leap years)
+      const mockTreasuryData = { observations: [{ date: '2023-03-31', value: '3.5' }] };
+      const mockCorporateData = { observations: [{ date: '2023-03-31', value: '4.5' }] };
+      const mockLatestTreasury = { observations: [{ date: '2023-03-31', value: '3.5' }] };
+      const mockLatestCorporate = { observations: [{ date: '2023-03-31', value: '4.5' }] };
+
+      mockedAxios.get
+        .mockResolvedValueOnce({ data: mockTreasuryData, status: 200 })
+        .mockResolvedValueOnce({ data: mockCorporateData, status: 200 })
+        .mockResolvedValueOnce({ data: mockLatestTreasury, status: 200 })
+        .mockResolvedValueOnce({ data: mockLatestCorporate, status: 200 });
+
+      const request = new Request(
+        'http://localhost/api/bonds?series=AAA&treasury=DGS10&start=2023-03-31&end=2023-03-31'
+      );
+      await GET(request);
+
+      const treasuryCall = mockedAxios.get.mock.calls[0][0] as string;
+      const corporateCall = mockedAxios.get.mock.calls[1][0] as string;
+
+      // March 31 -> February 28 (2023 is not a leap year)
+      expect(treasuryCall).toContain('observation_start=2023-02-28');
+      expect(corporateCall).toContain('observation_start=2023-02-28');
     });
 
     it('should use default date range when start and end are not provided', async () => {

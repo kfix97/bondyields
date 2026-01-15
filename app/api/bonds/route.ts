@@ -46,13 +46,35 @@ export async function GET(request: Request) {
     const endParam = searchParams.get('end');
     const startParam = searchParams.get('start');
     const endDate = endParam || new Date().toISOString().split('T')[0];
-    const startDate = startParam || new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const requestedStartDate = startParam || new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    
+    // Fetch one additional month before the requested start date to enable forward-filling
+    // for the first month of data in the chart
+    // Parse the date string to avoid timezone issues and handle month boundaries correctly
+    const [year, month, day] = requestedStartDate.split('-').map(Number);
+    let prevYear = year;
+    let prevMonth = month - 1;
+    
+    // Handle year rollover (January -> December of previous year)
+    if (prevMonth < 1) {
+      prevMonth = 12;
+      prevYear = year - 1;
+    }
+    
+    // Calculate the last day of the previous month to handle cases like March 31 -> February 28
+    // Day 0 of a month gives us the last day of the previous month
+    const lastDayOfPrevMonth = new Date(Date.UTC(prevYear, prevMonth, 0)).getUTCDate();
+    const targetDay = Math.min(day, lastDayOfPrevMonth);
+    const fetchStartDateObj = new Date(Date.UTC(prevYear, prevMonth - 1, targetDay)); // month is 0-indexed
+    const fetchStartDate = fetchStartDateObj.toISOString().split('T')[0];
+    const startDate = requestedStartDate; // Keep original startDate for filtering later
 
-    console.log('Start Date:', startDate);
+    console.log('Requested Start Date:', startDate);
+    console.log('Fetch Start Date (1 month earlier for continuity):', fetchStartDate);
     console.log('End Date:', endDate);
     
-    // Get Treasury data using the selected series
-    const fredUrl = `https://api.stlouisfed.org/fred/series/observations?series_id=${treasurySeries}&api_key=${FRED_API_KEY}&file_type=json&sort_order=asc&observation_start=${startDate}&observation_end=${endDate}`;
+    // Get Treasury data using the selected series (fetch from 1 month earlier)
+    const fredUrl = `https://api.stlouisfed.org/fred/series/observations?series_id=${treasurySeries}&api_key=${FRED_API_KEY}&file_type=json&sort_order=asc&observation_start=${fetchStartDate}&observation_end=${endDate}`;
     console.log('FRED Treasury URL:', fredUrl.replace(FRED_API_KEY || '', 'HIDDEN_KEY'));
     
     const fredResponse = await axios.get<{ observations: FREDObservation[] }>(fredUrl);
@@ -68,8 +90,8 @@ export async function GET(request: Request) {
       source: 'Treasury'
     })).filter((item): item is BondDataPoint => item.yield !== null); // Remove null values
 
-    // Get corporate bond data using the provided series
-    const corporateUrl = `https://api.stlouisfed.org/fred/series/observations?series_id=${corporateSeries}&api_key=${FRED_API_KEY}&file_type=json&sort_order=asc&observation_start=${startDate}&observation_end=${endDate}`;
+    // Get corporate bond data using the provided series (fetch from 1 month earlier)
+    const corporateUrl = `https://api.stlouisfed.org/fred/series/observations?series_id=${corporateSeries}&api_key=${FRED_API_KEY}&file_type=json&sort_order=asc&observation_start=${fetchStartDate}&observation_end=${endDate}`;
     console.log('FRED Corporate URL:', corporateUrl.replace(FRED_API_KEY || '', 'HIDDEN_KEY'));
     
     const corporateResponse = await axios.get<{ observations: FREDObservation[] }>(corporateUrl);
