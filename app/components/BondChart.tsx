@@ -371,11 +371,12 @@ export default function BondChart({ data, disableDateFilter = false }: BondChart
   const corporateYieldMap = new Map<string, number>();
   let lastKnownCorporateYield: number | null = null;
 
-  // Get all corporate data points within range, sorted by date
+  // Get all corporate data points up to the end date (including data before selectedStart for forward-filling)
+  // This allows us to use data from before the start date to forward-fill the first month
   const filteredCorporateData = corporateData
     .filter(d => {
       const date = new Date(d.date);
-      return date >= selectedStart && date <= selectedEnd;
+      return date <= selectedEnd; // Include data before selectedStart for forward-filling continuity
     })
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
@@ -399,7 +400,7 @@ export default function BondChart({ data, disableDateFilter = false }: BondChart
       corporateYieldMap.set(dateStr, mostRecentDataPoint.yield);
       lastKnownCorporateYield = mostRecentDataPoint.yield;
     } else if (lastKnownCorporateYield !== null) {
-      // Fallback to last known value if no data point found (shouldn't happen with filteredCorporateData, but safety check)
+      // Fallback to last known value if no data point found (for continuity)
       corporateYieldMap.set(dateStr, lastKnownCorporateYield);
     }
   });
@@ -408,16 +409,24 @@ export default function BondChart({ data, disableDateFilter = false }: BondChart
   const treasuryYieldMap = new Map<string, number>();
   let lastKnownTreasuryYield: number | null = null;
 
-  // Initialize with the first valid treasury yield in range
-  const filteredTreasuryData = treasuryData.filter(d => new Date(d.date) >= selectedStart && new Date(d.date) <= selectedEnd);
-  if (filteredTreasuryData.length > 0) {
-    lastKnownTreasuryYield = filteredTreasuryData[0].yield;
+  // Get all treasury data points up to the end date (including data before selectedStart for forward-filling)
+  // This allows us to use data from before the start date to forward-fill the first month
+  const treasuryDataForFilling = treasuryData.filter(d => {
+    const date = new Date(d.date);
+    return date <= selectedEnd; // Include data before selectedStart for forward-filling continuity
+  });
+  
+  // Initialize with the first valid treasury yield (from all data up to end date)
+  if (treasuryDataForFilling.length > 0) {
+    const sortedTreasury = treasuryDataForFilling.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    lastKnownTreasuryYield = sortedTreasury[0].yield;
   }
 
   // Fill in all business days with interpolated values for treasury yields
   businessDays.forEach(date => {
     const dateStr = date.toISOString().split('T')[0];
-    const actualDataPoint = treasuryData.find(d => d.date === dateStr);
+    // Look in all treasury data (including before selectedStart) for forward-filling
+    const actualDataPoint = treasuryDataForFilling.find(d => d.date === dateStr);
     if (actualDataPoint && actualDataPoint.yield !== null) {
       treasuryYieldMap.set(dateStr, actualDataPoint.yield);
       lastKnownTreasuryYield = actualDataPoint.yield;

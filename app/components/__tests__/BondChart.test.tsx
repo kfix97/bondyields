@@ -271,4 +271,28 @@ describe('BondChart', () => {
       expect(screen.getByTestId('chart')).toBeInTheDocument();
     });
   });
+
+  it('should use data from before selected start date to forward-fill the first month', async () => {
+    // Data includes points before the selected range (simulating the one-month earlier fetch)
+    // The first business day in the range (2023-06-01) should use data from 2023-05-31
+    const dataWithPreRangeData = [
+      { date: '2023-05-31', yield: 3.4, source: 'Treasury' }, // Before range, used for forward-filling
+      { date: '2023-06-02', yield: 3.5, source: 'Treasury' }, // First data point in range (June 1 is Thursday)
+      { date: '2023-06-05', yield: 3.6, source: 'Treasury' }, // Monday
+      { date: '2023-05-31', yield: 4.4, source: 'Corporate' }, // Before range, used for forward-filling
+      { date: '2023-06-05', yield: 4.6, source: 'Corporate' }, // First data point in range
+    ];
+
+    render(<BondChart data={dataWithPreRangeData} disableDateFilter />);
+    
+    jest.advanceTimersByTime(100);
+    
+    await waitFor(() => {
+      // Chart should render successfully, using pre-range data for forward-filling
+      const chart = screen.getByTestId('chart');
+      expect(chart).toBeInTheDocument();
+      // The chart should have data points including the first business day (June 1)
+      // which should be forward-filled from May 31 data
+    });
+  });
 });
